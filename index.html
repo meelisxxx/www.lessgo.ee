@@ -6,23 +6,26 @@
     <title>Lessgo</title>
     <style>
         body {
-            /* 1. Määra siin taustavärv */
-            background-color: #333333; 
+            background-color: #333333; /* Tumehall taust */
             margin: 0;
             padding: 0;
             
-            /* See paigutab asjad keskele */
+            /* See paigutab asjad täpselt ekraani keskele */
             display: flex;
             justify-content: center;
-            
-            /* See määrab, kui kaugel ülalt logo asub */
-            padding-top: 100px; 
+            align-items: center;
+            height: 100vh; /* Terve ekraani kõrgus */
         }
 
         img {
-            /* 2. Määra siin logo maksimaalne laius */
-            max-width: 300px; 
+            max-width: 300px; /* Pildi maksimaalne laius */
             height: auto;
+            
+            /* See teeb pildi ümmarguseks */
+            border-radius: 50%; 
+            
+            /* Lisame väikese varju, et pilt "hõljuks" */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
         }
     </style>
 </head>
@@ -31,5 +34,4 @@
     <img src="Logo.png" alt="Lessgo logo">
 
 </body>
-
 </html>
