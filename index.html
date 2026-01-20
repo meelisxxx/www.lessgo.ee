@@ -17,14 +17,14 @@
     
     <style>
         body {
-            background-color: #333333; /* Sinu valitud tumehall taust */
+            background-color: #333333; /* Sinu tumehall taust */
             margin: 0;
             padding: 0;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            color: white; /* Lisasin valge teksti, et see taustal välja paistaks */
+            color: white;
             font-family: sans-serif;
             text-align: center;
         }
@@ -37,7 +37,7 @@
         img {
             max-width: 300px;
             height: auto;
-            border-radius: 50%; /* Sinu ümmargune pilt */
+            border-radius: 50%; /* Sinu ümmargune logo */
             box-shadow: 0 10px 20px rgba(0,0,0,0.3);
             margin-bottom: 30px;
         }
@@ -45,6 +45,44 @@
         h1 { margin-bottom: 10px; font-size: 2em; }
         p { color: #cccccc; font-size: 1.1em; line-height: 1.5; }
         .keywords { font-weight: bold; color: #ffffff; margin-top: 20px; }
+
+        /* UUE KONTAKTINUPU STIILID */
+        .contact-button {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background-color: #ffffff; /* Valge nupp eristub hästi taustast */
+            color: #333333;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 28px;
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .contact-button:hover {
+            transform: scale(1.1); /* Nupp paisub veidi peale liikudes */
+        }
+
+        .contact-hint {
+            position: fixed;
+            bottom: 45px;
+            right: 100px;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            color: white;
+            pointer-events: none;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -63,6 +101,11 @@
             meelis@lessgo.ee
         </p>
     </div>
+
+    <div class="contact-hint">Küsi lisa!</div>
+    <a href="mailto:meelis@lessgo.ee" class="contact-button" title="Kirjuta meile">
+        ✉️
+    </a>
 
 </body>
 </html>
