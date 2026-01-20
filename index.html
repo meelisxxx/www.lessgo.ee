@@ -2,48 +2,67 @@
 <html lang="et">
 <head>
     <script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  "name": "Lessgo",
-  "url": "https://www.lessgo.ee/",
-  "description": "Lessgo koduleht on uuendamisel. Lessgo pakub kaasaegset raamatupidamist, tehisintellekti (AI) juurutamist ja BIM teenuseid."
-}
-</script>
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Lessgo",
+      "url": "https://www.lessgo.ee/",
+      "description": "Lessgo koduleht on uuendamisel. Lessgo pakub kaasaegset raamatupidamist, tehisintellekti (AI) juurutamist ja BIM teenuseid."
+    }
+    </script>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lessgo</title>
+    
     <style>
         body {
-            background-color: #333333; /* Tumehall taust */
+            background-color: #333333; /* Sinu valitud tumehall taust */
             margin: 0;
             padding: 0;
-            
-            /* See paigutab asjad täpselt ekraani keskele */
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh; /* Terve ekraani kõrgus */
+            height: 100vh;
+            color: white; /* Lisasin valge teksti, et see taustal välja paistaks */
+            font-family: sans-serif;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 600px;
+            padding: 20px;
         }
 
         img {
-            max-width: 300px; /* Pildi maksimaalne laius */
+            max-width: 300px;
             height: auto;
-            
-            /* See teeb pildi ümmarguseks */
-            border-radius: 50%; 
-            
-            /* Lisame väikese varju, et pilt "hõljuks" */
+            border-radius: 50%; /* Sinu ümmargune pilt */
             box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            margin-bottom: 30px;
         }
+
+        h1 { margin-bottom: 10px; font-size: 2em; }
+        p { color: #cccccc; font-size: 1.1em; line-height: 1.5; }
+        .keywords { font-weight: bold; color: #ffffff; margin-top: 20px; }
     </style>
 </head>
 <body>
 
-    <img src="Logo.png" alt="Lessgo logo">
+    <div class="container">
+        <img src="logo.png" alt="Lessgo logo"> 
+        
+        <h1>Uued lahendused on tulekul!</h1>
+        <p>Lessgo koduleht on praegu uuenemisel.</p>
+        
+        <p class="keywords">
+            Raamatupidamine | Tehisintellekt (AI) | BIM teenused
+        </p>
+        
+        <p style="font-size: 0.9em; margin-top: 40px;">
+            meelis@lessgo.ee
+        </p>
+    </div>
 
 </body>
 </html>
-
-
-
