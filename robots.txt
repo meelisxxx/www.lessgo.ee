@@ -1,4 +1,12 @@
 User-agent: *
 Allow: /
 
+# See ütleb spetsiaalselt AI robotitele, et nad on teretulnud
+User-agent: GPTBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+
 Sitemap: https://www.lessgo.ee/sitemap.xml
