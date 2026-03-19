@@ -1,83 +1,207 @@
 <!DOCTYPE html>
 <html lang="et">
 <head>
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-7EZD0M2S3D"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7EZD0M2S3D"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-7EZD0M2S3D');
+    </script>
 
-  gtag('config', 'G-7EZD0M2S3D');
-</script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
       "name": "Lessgo",
       "url": "https://www.lessgo.ee/",
-      "description": "LessGo koduleht on uuendamisel. Lessgo pakub kaasaegset raamatupidamist, tehisintellekti (AI) juurutamist."
+      "description": "LessGo pakub kaasaegset automatiseeritud ja paberivaba raamatupidamist koos AI lahendustega."
     }
     </script>
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lessgo</title>
+    <title>LessGo | Kaasaegne automatiseeritud raamatupidamine</title>
     
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+
     <style>
         body {
-            background-color: #333333; /* Sinu valitud tumehall taust */
+            background-color: #333333;
             margin: 0;
             padding: 0;
+            color: white;
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
-            height: 100vh;
-            color: white; /* Lisasin valge teksti, et see taustal välja paistaks */
-            font-family: sans-serif;
-            text-align: center;
         }
 
         .container {
-            max-width: 600px;
-            padding: 20px;
+            max-width: 650px;
+            width: 90%;
+            padding: 60px 20px;
+            text-align: center;
         }
 
-        img {
-            max-width: 300px;
+        img.logo {
+            max-width: 180px;
             height: auto;
-            border-radius: 50%; /* Sinu ümmargune pilt */
-            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
-            margin-bottom: 30px;
+            border-radius: 50%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            margin-bottom: 20px;
         }
 
-        h1 { margin-bottom: 10px; font-size: 2em; }
-        p { color: #cccccc; font-size: 1.1em; line-height: 1.5; }
-        .keywords { font-weight: bold; color: #ffffff; margin-top: 20px; }
+        h1 { font-weight: 600; font-size: 2.2em; margin-bottom: 5px; letter-spacing: -0.5px; }
+        h2 { font-weight: 600; color: #ffffff; margin-top: 40px; margin-bottom: 20px; text-align: left; }
+        
+        p { color: #cccccc; font-size: 1.05em; }
+
+        /* Teenuste sektsioon */
+        .services {
+            text-align: left;
+            margin: 40px 0;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 30px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .services strong { color: #ffffff; }
+
+        /* Kontaktivormi stiilid */
+        .contact-section {
+            text-align: left;
+            margin-top: 50px;
+            width: 100%;
+        }
+
+        .contact-form {
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+
+        .form-group { margin-bottom: 20px; }
+        
+        label { display: block; margin-bottom: 8px; color: #bbb; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; }
+        
+        input, textarea {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #444;
+            background: #3a3a3a;
+            color: white;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #777;
+        }
+
+        button {
+            background-color: #ffffff;
+            color: #333;
+            border: none;
+            padding: 15px 25px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, background-color 0.2s;
+            width: 100%;
+            font-size: 1em;
+        }
+
+        button:hover {
+            background-color: #e5e5e5;
+            transform: translateY(-2px);
+        }
+
+        /* Jalus */
+        .footer {
+            margin-top: 80px;
+            padding-bottom: 40px;
+            font-size: 0.95em;
+            color: #888;
+            border-top: 1px solid #444;
+            width: 100%;
+            padding-top: 30px;
+        }
+
+        a { color: #ffffff; text-decoration: none; transition: opacity 0.2s; }
+        a:hover { opacity: 0.7; }
+
+        .linkedin-link {
+            display: inline-block;
+            margin-top: 15px;
+            background: #0077b5;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+
+        .linkedin-link:hover { opacity: 0.9; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <img src="Logo.png" alt="Lessgo logo"> 
+        <img src="Logo.png" alt="Lessgo logo" class="logo">
         
-        
-        <p>LessGo koduleht on praegu uuendamisel.</p>
-        
-        <p class="keywords">
-           
-        </p>
-        
-        <p style="font-size: 0.9em; margin-top: 40px;">
-            meelis@lessgo.ee
-        </p>
+        <h1>LessGo OÜ</h1>
+        <p>Kaasaegne raamatupidamispartner sinu ettevõttele.</p>
+
+        <section class="services">
+            <h2>Teenused</h2>
+            <p>LessGo pakub <strong>kaasaegset automatiseeritud ja paberivaba</strong> raamatupidamist. Meie eesmärk on muuta finantshaldus nähtamatuks ja efektiivseks protsessiks.</p>
+            <p>Kasutame <strong>tehisintellekti (AI)</strong> ja nutikaid liideseid, et vabastada sind andmete sisestamisest ning pakkuda reaalajas ülevaadet ettevõtte käekäigust.</p>
+        </section>
+
+        <section class="contact-section">
+            <h2>Võta ühendust</h2>
+            <div class="contact-form">
+                <form action="https://formspree.io/f/xbddlken" method="POST">
+                    <div class="form-group">
+                        <label for="name">Nimi</label>
+                        <input type="text" id="name" name="name" required placeholder="Sinu nimi">
+                    </div>
+                    <div class="form-group">
+                        <label for="company">Ettevõtte nimi</label>
+                        <input type="text" id="company" name="company" placeholder="Ettevõte OÜ">
+                    </div>
+                    <div class="form-group">
+                        <label for="email">E-posti aadress</label>
+                        <input type="email" id="email" name="email" required placeholder="sinu@email.ee">
+                    </div>
+                    <div class="form-group">
+                        <label for="message">Sinu päring</label>
+                        <textarea id="message" name="message" rows="5" required placeholder="Kuidas saame sulle kasulikud olla?"></textarea>
+                    </div>
+                    <button type="submit">Saada päring</button>
+                </form>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <p>
+                E-post: <a href="mailto:meelis@lessgo.ee">meelis@lessgo.ee</a>
+            </p>
+            <a href="https://www.linkedin.com/in/meelisvarend/" target="_blank" class="linkedin-link">
+                LinkedIn profiil
+            </a>
+            <p style="margin-top: 30px; font-size: 0.8em; opacity: 0.5;">© 2024 LessGo OÜ</p>
+        </footer>
     </div>
 
 </body>
 </html>
-
-
-
-
-
-
