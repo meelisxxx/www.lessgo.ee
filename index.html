@@ -10,14 +10,48 @@
     </script>
 
     <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebSite",
-      "name": "Lessgo",
-      "url": "https://www.lessgo.ee/",
-      "description": "LessGo pakub kaasaegset automatiseeritud ja paberivaba raamatupidamist koos AI lahendustega."
-    }
-    </script>
+{
+  "@context": "https://schema.org",
+  "@type": "AccountingService",
+  "name": "LessGo OÜ",
+  "url": "https://www.lessgo.ee/",
+  "logo": "https://www.lessgo.ee/Logo.png",
+  "image": "https://www.lessgo.ee/Logo.png",
+  "description": "Kaasaegne automatiseeritud ja paberivaba raamatupidamine. AI-põhised töövoogude lahendused ja dokumentide digitaliseerimine.",
+  "address": {
+    "@type": "PostalAddress",
+    "addressCountry": "EE"
+  },
+  "email": "meelis@lessgo.ee",
+  "priceRange": "€€",
+  "offers": {
+    "@type": "Offer",
+    "description": "Raamatupidamisteenus alates 40€ kuus",
+    "price": "40.00",
+    "priceCurrency": "EUR"
+  },
+  "hasOfferCatalog": {
+    "@type": "OfferCatalog",
+    "name": "Raamatupidamisteenused",
+    "itemListElement": [
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "Paberivaba raamatupidamine"
+        }
+      },
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "AI töövoogude automatiseerimine"
+        }
+      }
+    ]
+  }
+}
+</script>
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
