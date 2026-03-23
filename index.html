@@ -46,7 +46,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LessGo | Kaasaegne automatiseeritud raamatupidamine</title>
+    
     <link rel="icon" type="image/png" href="Logo.png">
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
@@ -81,10 +83,8 @@
 
         h1 { font-weight: 600; font-size: 2.2em; margin-bottom: 5px; letter-spacing: -0.5px; }
         h2 { font-weight: 600; color: #ffffff; margin-top: 40px; margin-bottom: 20px; text-align: left; }
-        
         p { color: #cccccc; font-size: 1.05em; }
 
-        /* Teenuste sektsioon */
         .services {
             text-align: left;
             margin: 40px 0;
@@ -96,7 +96,31 @@
 
         .services strong { color: #ffffff; }
 
-        /* Kontaktivormi stiilid */
+        .pricing {
+            text-align: left;
+            margin: 40px 0;
+            background: rgba(255, 255, 255, 0.03); 
+            padding: 35px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .price-box {
+            margin-top: 25px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border-left: 4px solid #ffffff; 
+        }
+
+        .price-tag {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #ffffff;
+            display: block;
+            margin-bottom: 5px;
+        }
+
         .contact-section {
             text-align: left;
             margin-top: 50px;
@@ -111,7 +135,6 @@
         }
 
         .form-group { margin-bottom: 20px; }
-        
         label { display: block; margin-bottom: 8px; color: #bbb; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; }
         
         input, textarea {
@@ -150,7 +173,6 @@
             transform: translateY(-2px);
         }
 
-        /* Jalus */
         .footer {
             margin-top: 80px;
             padding-bottom: 40px;
@@ -175,32 +197,6 @@
         }
 
         .linkedin-link:hover { opacity: 0.9; }
-
-        /* Hinnakirja sektsioon */
-        .pricing {
-            text-align: left;
-            margin: 40px 0;
-            background: rgba(255, 255, 255, 0.03); 
-            padding: 35px;
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        .price-box {
-            margin-top: 25px;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
-            border-left: 4px solid #ffffff; 
-        }
-
-        .price-tag {
-            font-size: 1.2em;
-            font-weight: 600;
-            color: #ffffff;
-            display: block;
-            margin-bottom: 5px;
-        }
     </style>
 </head>
 <body>
@@ -213,10 +209,11 @@
 
         <section class="services" itemscope itemtype="https://schema.org/Service">
             <h2 itemprop="name">Kaasaegsed raamatupidamisteenused</h2>
-            <p itemprop="description">
-            <p>Pakume kaasaegseid, täielikult <strong>automatiseeritud digitaalseid raamatupidamislahendusi</strong>, mis tagavad ajasäästu ja täpsuse. Meie eesmärk on muuta finantshaldus nähtamatuks ja efektiivseks protsessiks.</p>
-            <p>Paberivaba üleminek: <strong>digitaliseerime teie paberdokumendid ja tšekid</strong> kiiresti, et andmed jõuaksid automaatselt raamatupidamisse.</p>
-            <p>Kasutame tehisintellekti, nutikaid liideseid ja töövoogude automatiseerimist, et vabastada teid andmete sisestamisest ning pakkuda reaalajas ülevaadet ettevõtte käekäigust.</p>
+            <div itemprop="description">
+                <p>Pakume kaasaegseid, täielikult <strong>automatiseeritud digitaalseid raamatupidamislahendusi</strong>, mis tagavad ajasäästu ja täpsuse. Meie eesmärk on muuta finantshaldus nähtamatuks ja efektiivseks protsessiks.</p>
+                <p>Paberivaba üleminek: <strong>digitaliseerime teie paberdokumendid ja tšekid</strong> kiiresti, et andmed jõuaksid automaatselt raamatupidamisse.</p>
+                <p>Kasutame tehisintellekti, nutikaid liideseid ja töövoogude automatiseerimist, et vabastada teid andmete sisestamisest ning pakkuda reaalajas ülevaadet ettevõtte käekäigust.</p>
+            </div>
             <meta itemprop="serviceType" content="AI raamatupidamine ja paberivaba automatiseerimine">
         </section>
 
@@ -259,9 +256,7 @@
             <p>
                 E-post: <a href="mailto:meelis@lessgo.ee">meelis@lessgo.ee</a>
             </p>
-            <a href="https://www.linkedin.com/in/meelisvarend/" target="_blank" class="linkedin-link">
-                LinkedIn profiil
-            </a>
+
             <p style="margin-top: 30px; font-size: 0.8em; opacity: 0.5;">© 2026 LessGo OÜ</p>
         </footer>
     </div>
