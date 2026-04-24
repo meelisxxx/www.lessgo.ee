@@ -1,1 +1,716 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skoor — LessGo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #111827;
+      --bg2:      #1f2937;
+      --bg3:      #374151;
+      --border:   rgba(255,255,255,0.08);
+      --text:     #f9fafb;
+      --text2:    #9ca3af;
+      --text3:    #6b7280;
+      --accent:   #10b981;
+      --pos:      #10b981;
+      --neg:      #ef4444;
+      --radius:   12px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Auth ── */
+    #auth-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .auth-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    .auth-logo {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-bottom: 20px;
+    }
+    .auth-card h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .auth-subtitle {
+      color: var(--text2);
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    .auth-card input {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 15px;
+      margin-bottom: 12px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .auth-card input:focus { border-color: var(--accent); }
+    .auth-card input::placeholder { color: var(--text3); }
+    .btn-primary {
+      width: 100%;
+      padding: 12px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: opacity 0.2s;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .error-msg { color: var(--neg); font-size: 13px; margin-top: 12px; }
+
+    /* ── App layout ── */
+    #app { display: none; flex-direction: column; min-height: 100vh; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-logo { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+    .header-title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
+    .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+    select {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      padding: 8px 12px;
+      cursor: pointer;
+      outline: none;
+    }
+    select:focus { border-color: var(--accent); }
+
+    .btn-logout {
+      padding: 8px 16px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text2);
+      font-family: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .btn-logout:hover { border-color: var(--neg); color: var(--neg); }
+
+    main { padding: 28px 24px; max-width: 1200px; margin: 0 auto; width: 100%; }
+
+    .page-title {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .page-title h2 { font-size: 22px; font-weight: 700; }
+    .page-title .period-badge {
+      font-size: 13px;
+      color: var(--text2);
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+
+    /* ── KPI cards ── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .kpi-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 20px;
+    }
+    .kpi-label { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+    .kpi-value { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
+    .kpi-delta { font-size: 13px; display: flex; align-items: center; gap: 4px; }
+    .kpi-delta.up   { color: var(--pos); }
+    .kpi-delta.down { color: var(--neg); }
+    .kpi-delta.neutral { color: var(--text2); }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .card h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text2);
+      margin-bottom: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    /* ── Chart ── */
+    .chart-wrap { position: relative; height: 260px; }
+
+    /* ── Tables ── */
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 768px) { .detail-grid { grid-template-columns: 1fr; } }
+
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    table th {
+      text-align: left;
+      color: var(--text3);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      padding: 0 8px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    table th:not(:first-child) { text-align: right; }
+    table td { padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    table td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+    table tr:last-child td { border-bottom: none; }
+    .row-section td:first-child {
+      font-weight: 600;
+      color: var(--accent);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding-top: 16px;
+    }
+    .row-total td {
+      font-weight: 600;
+      color: var(--text);
+    }
+    .row-total td:first-child { font-size: 13px; }
+    .val-pos { color: var(--pos); }
+    .val-neg { color: var(--neg); }
+
+    /* Comparison table */
+    #comparison-table th, #comparison-table td { padding: 10px 12px; }
+    #comparison-table td:first-child { color: var(--text2); }
+
+    .loading { color: var(--text2); font-size: 14px; padding: 20px 0; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ AUTH ═══════════════════════════════ -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <img src="../Logo.png" alt="LessGo" class="auth-logo">
+    <h1>Skoor</h1>
+    <p class="auth-subtitle">Ülevaade</p>
+    <form id="login-form">
+      <input type="email"    id="email"    placeholder="E-posti aadress" autocomplete="email" required>
+      <input type="password" id="password" placeholder="Parool" autocomplete="current-password" required>
+      <button type="submit" class="btn-primary" id="login-btn">Logi sisse</button>
+      <p class="error-msg" id="login-error"></p>
+    </form>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ APP ════════════════════════════════ -->
+<div id="app">
+  <header>
+    <div class="header-left">
+      <img src="../Logo.png" alt="LessGo" class="header-logo">
+      <span class="header-title">Skoor</span>
+    </div>
+    <div class="header-right">
+      <select id="client-select" style="display:none"></select>
+      <select id="period-select"></select>
+      <button class="btn-logout" id="logout-btn">Logi välja</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-title">
+      <h2 id="client-name">—</h2>
+      <span class="period-badge" id="period-badge">—</span>
+    </div>
+
+    <!-- KPI -->
+    <div class="kpi-grid">
+      <div class="kpi-card" id="kpi-kaive">
+        <div class="kpi-label">Käive</div>
+        <div class="kpi-value">—</div>
+        <div class="kpi-delta neutral">Laen...</div>
+      </div>
+      <div class="kpi-card" id="kpi-arikasum">
+        <div class="kpi-label">Ärikasum</div>
+        <div class="kpi-value">—</div>
+        <div class="kpi-delta neutral">Laen...</div>
+      </div>
+      <div class="kpi-card" id="kpi-netkasum">
+        <div class="kpi-label">Nettokasum</div>
+        <div class="kpi-value">—</div>
+        <div class="kpi-delta neutral">Laen...</div>
+      </div>
+      <div class="kpi-card" id="kpi-omakapital">
+        <div class="kpi-label">Omakapital</div>
+        <div class="kpi-value">—</div>
+        <div class="kpi-delta neutral">Laen...</div>
+      </div>
+    </div>
+
+    <!-- Trend chart -->
+    <div class="card">
+      <h3>Käibe ja kasumi trend</h3>
+      <div class="chart-wrap">
+        <canvas id="trend-chart"></canvas>
+      </div>
+    </div>
+
+    <!-- Comparison -->
+    <div class="card">
+      <h3>Võrdlus perioodidega</h3>
+      <table id="comparison-table">
+        <thead>
+          <tr>
+            <th>Näitaja</th>
+            <th id="col-current">Valitud kuu</th>
+            <th>Eelmine kuu</th>
+            <th>Eelmine aasta</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- Detail tables -->
+    <div class="detail-grid">
+      <div class="card">
+        <h3>Kasumiaruanne</h3>
+        <table><tbody id="ka-tbody"></tbody></table>
+      </div>
+      <div class="card">
+        <h3>Bilanss</h3>
+        <table><tbody id="bi-tbody"></tbody></table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const SUPABASE_URL  = 'https://lpehwgpitfowhyiaxrhe.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWh3Z3BpdGZvd2h5aWF4cmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzE3NDIsImV4cCI6MjA5MjYwNzc0Mn0.VRAFWMrlyigtPlDVAk9KG2NiFLd1l5aRxwmNrariUfI';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let isAdmin = false;
+let selectedClientId = null;
+let selectedPeriod   = null;
+let trendChart       = null;
+
+// ── Helpers ────────────────────────────────────────────────────────
+
+const fmt = (v) =>
+  v == null ? '—' :
+  new Intl.NumberFormat('et-EE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v) + ' €';
+
+const fmtDelta = (curr, prev) => {
+  if (prev == null || prev === 0) return { text: '—', cls: 'neutral' };
+  const pct = ((curr - prev) / Math.abs(prev)) * 100;
+  const sign = pct >= 0 ? '+' : '';
+  return {
+    text: `${sign}${pct.toFixed(1)}% vs eelmine kuu`,
+    cls: pct >= 0 ? 'up' : 'down'
+  };
+};
+
+const findRow = (data, no) =>
+  (data?.Data || []).find(r => r.No === no);
+
+const bal = (row, idx = 0) =>
+  row?.Balance?.[idx] ?? null;
+
+function extractKPIs(ka, bi) {
+  return {
+    kaive:      bal(findRow(ka, '1030')),
+    arikasum:   bal(findRow(ka, '3000')),
+    netKasum:   bal(findRow(ka, '6000')),
+    omakapital: bal(findRow(bi, '8090')),
+    varad:      bal(findRow(bi, '3080')),
+    kohustised: bal(findRow(bi, '7090')),
+  };
+}
+
+function prevPeriodStr(period) {
+  const [mm, yyyy] = period.split('.');
+  let m = parseInt(mm), y = parseInt(yyyy);
+  m--; if (m < 1) { m = 12; y--; }
+  return `${String(m).padStart(2,'0')}.${y}`;
+}
+
+function prevYearPeriodStr(period) {
+  const [mm, yyyy] = period.split('.');
+  return `${mm}.${parseInt(yyyy) - 1}`;
+}
+
+// ── Show/hide ──────────────────────────────────────────────────────
+
+function showAuth() {
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+function showApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('app').style.flexDirection = 'column';
+}
+
+// ── Auth ───────────────────────────────────────────────────────────
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-error');
+  btn.disabled = true;
+  btn.textContent = 'Sisselogimine...';
+  err.textContent = '';
+
+  const { error } = await sb.auth.signInWithPassword({
+    email:    document.getElementById('email').value.trim(),
+    password: document.getElementById('password').value,
+  });
+
+  if (error) {
+    err.textContent = 'Vale e-post või parool.';
+    btn.disabled = false;
+    btn.textContent = 'Logi sisse';
+  }
+});
+
+document.getElementById('logout-btn').addEventListener('click', () =>
+  sb.auth.signOut()
+);
+
+// ── Init ───────────────────────────────────────────────────────────
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) await onLogin(session.user);
+  else showAuth();
+
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN')  await onLogin(session.user);
+    if (event === 'SIGNED_OUT') showAuth();
+  });
+}
+
+async function onLogin(user) {
+  const { data: adminRow } = await sb.from('admins').select('user_id').eq('user_id', user.id).maybeSingle();
+  isAdmin = !!adminRow;
+
+  const { data: clients } = await sb.from('clients').select('*').order('name');
+  const clientSel = document.getElementById('client-select');
+
+  if (isAdmin && clients?.length > 1) {
+    clientSel.innerHTML = clients.map(c =>
+      `<option value="${c.id}">${c.name}</option>`
+    ).join('');
+    clientSel.style.display = 'block';
+    selectedClientId = clients[0].id;
+    document.getElementById('client-name').textContent = clients[0].name;
+
+    clientSel.addEventListener('change', async () => {
+      selectedClientId = clientSel.value;
+      const c = clients.find(x => x.id === selectedClientId);
+      document.getElementById('client-name').textContent = c?.name || '';
+      await loadPeriods(selectedClientId);
+      await loadDashboard();
+    });
+  } else {
+    const { data: uc } = await sb.from('user_clients').select('client_id, clients(name)').eq('user_id', user.id);
+    selectedClientId = uc?.[0]?.client_id;
+    document.getElementById('client-name').textContent = uc?.[0]?.clients?.name || '';
+  }
+
+  if (selectedClientId) {
+    await loadPeriods(selectedClientId);
+    await loadDashboard();
+  }
+
+  showApp();
+}
+
+async function loadPeriods(clientId) {
+  const { data } = await sb
+    .from('reports')
+    .select('period, year, month')
+    .eq('client_id', clientId)
+    .eq('report_type', 'kasumiaruanne')
+    .order('year',  { ascending: false })
+    .order('month', { ascending: false });
+
+  const sel = document.getElementById('period-select');
+  sel.innerHTML = (data || []).map(r =>
+    `<option value="${r.period}">${r.period}</option>`
+  ).join('');
+
+  selectedPeriod = data?.[0]?.period || null;
+
+  sel.onchange = async () => {
+    selectedPeriod = sel.value;
+    await loadDashboard();
+  };
+}
+
+// ── Load dashboard ─────────────────────────────────────────────────
+
+async function loadDashboard() {
+  if (!selectedClientId || !selectedPeriod) return;
+
+  document.getElementById('period-badge').textContent = selectedPeriod;
+  document.getElementById('col-current').textContent  = selectedPeriod;
+
+  const [kaRow, biRow] = await Promise.all([
+    sb.from('reports').select('data').eq('client_id', selectedClientId).eq('period', selectedPeriod).eq('report_type', 'kasumiaruanne').maybeSingle(),
+    sb.from('reports').select('data').eq('client_id', selectedClientId).eq('period', selectedPeriod).eq('report_type', 'bilanss').maybeSingle(),
+  ]);
+
+  const ka = kaRow?.data?.data;
+  const bi = biRow?.data?.data;
+  if (!ka || !bi) return;
+
+  const kpis = extractKPIs(ka, bi);
+
+  // Load comparison periods
+  const prevP     = prevPeriodStr(selectedPeriod);
+  const prevYearP = prevYearPeriodStr(selectedPeriod);
+
+  const [kaP, kaPY] = await Promise.all([
+    sb.from('reports').select('data').eq('client_id', selectedClientId).eq('period', prevP).eq('report_type', 'kasumiaruanne').maybeSingle(),
+    sb.from('reports').select('data').eq('client_id', selectedClientId).eq('period', prevYearP).eq('report_type', 'kasumiaruanne').maybeSingle(),
+  ]);
+
+  const prevKPIs     = kaP?.data?.data   ? extractKPIs(kaP.data.data,  {}) : null;
+  const prevYearKPIs = kaPY?.data?.data  ? extractKPIs(kaPY.data.data, {}) : null;
+
+  renderKPIs(kpis, prevKPIs);
+  renderComparison(kpis, prevKPIs, prevYearKPIs, prevP, prevYearP);
+  renderKasumiaruanne(ka);
+  renderBilanss(bi);
+  await renderTrendChart();
+}
+
+// ── KPI cards ──────────────────────────────────────────────────────
+
+function renderKPIs(kpis, prev) {
+  const items = [
+    { id: 'kpi-kaive',     label: 'Käive',      val: kpis.kaive,      prevVal: prev?.kaive },
+    { id: 'kpi-arikasum',  label: 'Ärikasum',   val: kpis.arikasum,   prevVal: prev?.arikasum },
+    { id: 'kpi-netkasum',  label: 'Nettokasum', val: kpis.netKasum,   prevVal: prev?.netKasum },
+    { id: 'kpi-omakapital',label: 'Omakapital', val: kpis.omakapital, prevVal: null },
+  ];
+
+  items.forEach(({ id, val, prevVal }) => {
+    const card = document.getElementById(id);
+    card.querySelector('.kpi-value').textContent = fmt(val);
+    card.querySelector('.kpi-value').className =
+      'kpi-value' + (val < 0 ? ' val-neg' : '');
+
+    const delta = fmtDelta(val, prevVal);
+    const d = card.querySelector('.kpi-delta');
+    d.textContent  = delta.text;
+    d.className    = `kpi-delta ${delta.cls}`;
+  });
+}
+
+// ── Comparison table ───────────────────────────────────────────────
+
+function renderComparison(cur, prev, prevYear, prevLabel, prevYearLabel) {
+  const rows = [
+    { label: 'Käive',      cur: cur.kaive,      p: prev?.kaive,      py: prevYear?.kaive },
+    { label: 'Ärikasum',   cur: cur.arikasum,   p: prev?.arikasum,   py: prevYear?.arikasum },
+    { label: 'Nettokasum', cur: cur.netKasum,   p: prev?.netKasum,   py: prevYear?.netKasum },
+  ];
+
+  const ths = document.querySelectorAll('#comparison-table thead th');
+  if (ths[2]) ths[2].textContent = prevLabel;
+  if (ths[3]) ths[3].textContent = prevYearLabel;
+
+  document.querySelector('#comparison-table tbody').innerHTML = rows.map(r => {
+    const diffP  = r.p  != null ? r.cur - r.p  : null;
+    const diffPY = r.py != null ? r.cur - r.py : null;
+    const cls = (v) => v == null ? '' : v >= 0 ? 'val-pos' : 'val-neg';
+    const fmtDiff = (v) => v == null ? '—' :
+      (v >= 0 ? '+' : '') + fmt(v).replace(' €','') + ' €';
+    return `<tr>
+      <td>${r.label}</td>
+      <td>${fmt(r.cur)}</td>
+      <td>${fmt(r.p)} <small class="${cls(diffP)}">${fmtDiff(diffP)}</small></td>
+      <td>${fmt(r.py)} <small class="${cls(diffPY)}">${fmtDiff(diffPY)}</small></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Trend chart ────────────────────────────────────────────────────
+
+async function renderTrendChart() {
+  const { data } = await sb
+    .from('reports')
+    .select('period, year, month, data')
+    .eq('client_id', selectedClientId)
+    .eq('report_type', 'kasumiaruanne')
+    .order('year',  { ascending: true })
+    .order('month', { ascending: true });
+
+  const recent = (data || []).slice(-12);
+  const labels  = recent.map(r => r.period);
+  const kaive   = recent.map(r => bal(findRow(r.data, '1030')) ?? 0);
+  const netK    = recent.map(r => bal(findRow(r.data, '6000')) ?? 0);
+
+  if (trendChart) trendChart.destroy();
+
+  trendChart = new Chart(document.getElementById('trend-chart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Käive',
+          data: kaive,
+          backgroundColor: 'rgba(16,185,129,0.25)',
+          borderColor: '#10b981',
+          borderWidth: 2,
+          borderRadius: 4,
+        },
+        {
+          label: 'Nettokasum',
+          data: netK,
+          type: 'line',
+          borderColor: '#6366f1',
+          backgroundColor: 'rgba(99,102,241,0.15)',
+          borderWidth: 2,
+          pointRadius: 4,
+          pointBackgroundColor: '#6366f1',
+          tension: 0.3,
+          fill: true,
+          yAxisID: 'y',
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#9ca3af', font: { family: 'Inter', size: 12 } } },
+        tooltip: {
+          backgroundColor: '#1f2937',
+          titleColor: '#f9fafb',
+          bodyColor: '#9ca3af',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.raw)}` },
+        },
+      },
+      scales: {
+        x: { ticks: { color: '#6b7280', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color: '#6b7280', font: { size: 11 }, callback: v => fmt(v) }, grid: { color: 'rgba(255,255,255,0.06)' } },
+      },
+    },
+  });
+}
+
+// ── Kasumiaruanne table ────────────────────────────────────────────
+
+function renderKasumiaruanne(ka) {
+  const tbody = document.getElementById('ka-tbody');
+  tbody.innerHTML = (ka?.Data || []).map(r => {
+    const v = r.Balance?.[0] ?? null;
+    if (r.RowType === 1 && r.Description) {
+      return `<tr class="row-section"><td colspan="2">${r.Description}</td></tr>`;
+    }
+    if (r.RowType === 3 && r.Description) {
+      return `<tr><td>${r.Description}</td><td class="${v < 0 ? 'val-neg':''}">${fmt(v)}</td></tr>`;
+    }
+    if (r.RowType === 4 && r.Description) {
+      return `<tr class="row-total"><td>${r.Description}</td><td class="${v < 0 ? 'val-neg':''}">${fmt(v)}</td></tr>`;
+    }
+    return '';
+  }).join('');
+}
+
+// ── Bilanss table ──────────────────────────────────────────────────
+
+function renderBilanss(bi) {
+  const tbody = document.getElementById('bi-tbody');
+  tbody.innerHTML = (bi?.Data || []).map(r => {
+    const v = r.Balance?.[0] ?? null;
+    if (r.RowType === 1 && r.Description) {
+      return `<tr class="row-section"><td colspan="2">${r.Description.trim()}</td></tr>`;
+    }
+    if (r.RowType === 2 && r.Description) {
+      return `<tr><td>${r.Description.trim()}</td><td>${fmt(v)}</td></tr>`;
+    }
+    if (r.RowType === 4 && r.Description) {
+      return `<tr class="row-total"><td>${r.Description.trim()}</td><td>${fmt(v)}</td></tr>`;
+    }
+    return '';
+  }).join('');
+}
+
+// ── Start ──────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
 
