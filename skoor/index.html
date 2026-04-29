@@ -264,12 +264,35 @@
     #comparison-table td:first-child { color: var(--text2); }
     .comparison-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
+    /* Võlgnikud */
+    .debts-kpi { grid-template-columns: 1fr 1fr; margin-bottom: 20px; }
+    .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; }
+    .filter-btn {
+      padding: 6px 14px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text2);
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-btn:hover { color: var(--text); }
+    .filter-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .muted { color: var(--text2); font-weight: 400; font-size: 12px; margin-left: 6px; }
+    .debts-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    #debts-table { min-width: 620px; }
+    #debts-table tr.row-overdue td:nth-child(5) { color: var(--neg); font-weight: 600; }
+    #debts-table tr.row-overdue td:last-child { color: var(--neg); font-weight: 600; }
+    .empty-row td { text-align: center; color: var(--text2); padding: 20px 0 !important; }
+
     .loading { color: var(--text2); font-size: 14px; padding: 20px 0; }
 
     /* ── Print / PDF ── */
     @media print {
       body { background: #fff; color: #000; }
-      header, .btn-pdf, .btn-logout, #client-select, #period-select { display: none !important; }
+      header, .btn-pdf, .btn-logout, #client-select, #period-select, .filter-bar { display: none !important; }
       .card { background: #fff; border: 1px solid #ddd; break-inside: avoid; }
       .kpi-grid { grid-template-columns: repeat(5, 1fr); }
       .kpi-card { background: #f9f9f9; border: 1px solid #ddd; }
@@ -409,6 +432,42 @@
       </table></div>
     </div>
 
+    <!-- Tasumata arved -->
+    <div class="card">
+      <h3>Tasumata arved <span class="muted" id="debts-snapshot"></span></h3>
+      <div class="kpi-grid debts-kpi">
+        <div class="kpi-card">
+          <div class="kpi-label">Tasumata kokku</div>
+          <div class="kpi-value" id="debts-total">—</div>
+          <div class="kpi-delta neutral" id="debts-count">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Üle tähtaja</div>
+          <div class="kpi-value" id="debts-overdue">—</div>
+          <div class="kpi-delta neutral" id="debts-overdue-count">—</div>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <button class="filter-btn active" data-filter="all">Kõik</button>
+        <button class="filter-btn" data-filter="overdue">Ainult üle tähtaja</button>
+      </div>
+      <div class="debts-scroll">
+        <table id="debts-table">
+          <thead>
+            <tr>
+              <th>Klient</th>
+              <th>Dokument</th>
+              <th>Kuupäev</th>
+              <th>Tähtaeg</th>
+              <th>Päevi</th>
+              <th>Tasumata</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Detail tables -->
     <div class="detail-grid">
       <div class="card">
@@ -433,6 +492,8 @@ let isAdmin = false;
 let selectedClientId = null;
 let selectedPeriod   = null;
 let trendChart       = null;
+let allDebts         = [];
+let debtsFilter      = 'all';
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -663,7 +724,105 @@ async function loadDashboard() {
   renderKasumiaruanne(ka);
   renderBilanss(bi);
   await renderTrendChart();
+  await loadDebts();
 }
+
+// ── Võlgnikud ──────────────────────────────────────────────────────
+
+async function loadDebts() {
+  const { data: latest } = await sb
+    .from('debts')
+    .select('snapshot_date, data')
+    .eq('client_id', selectedClientId)
+    .order('snapshot_date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const tbody = document.querySelector('#debts-table tbody');
+  if (!latest) {
+    document.getElementById('debts-snapshot').textContent = '';
+    document.getElementById('debts-total').textContent   = '—';
+    document.getElementById('debts-count').textContent   = '—';
+    document.getElementById('debts-overdue').textContent = '—';
+    document.getElementById('debts-overdue-count').textContent = '—';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Andmeid ei leitud</td></tr>';
+    allDebts = [];
+    return;
+  }
+
+  const d = new Date(latest.snapshot_date);
+  document.getElementById('debts-snapshot').textContent =
+    `(seisuga ${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()})`;
+
+  // data võib olla massiiv (õige) või objekt (vana bugi puhul)
+  allDebts = Array.isArray(latest.data) ? latest.data
+           : (latest.data ? [latest.data] : []);
+
+  renderDebts();
+}
+
+function renderDebts() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const enriched = allDebts.map(d => {
+    const due = d.DueDate ? new Date(d.DueDate) : null;
+    const daysOver = due ? Math.floor((today - due) / 86400000) : 0;
+    return { ...d, _daysOver: daysOver, _isOverdue: daysOver > 0 };
+  });
+
+  const totalUnpaid   = enriched.reduce((s,d) => s + (d.UnPaidAmount || 0), 0);
+  const overdueAmount = enriched.filter(d => d._isOverdue).reduce((s,d) => s + (d.UnPaidAmount || 0), 0);
+  const overdueCount  = enriched.filter(d => d._isOverdue).length;
+
+  document.getElementById('debts-total').textContent          = fmt(totalUnpaid);
+  document.getElementById('debts-count').textContent          = `${enriched.length} arvet`;
+  document.getElementById('debts-overdue').textContent        = fmt(overdueAmount);
+  document.getElementById('debts-overdue-count').textContent  = `${overdueCount} arvet`;
+
+  const filtered = debtsFilter === 'overdue'
+    ? enriched.filter(d => d._isOverdue)
+    : enriched;
+
+  filtered.sort((a, b) => b._daysOver - a._daysOver);
+
+  const tbody = document.querySelector('#debts-table tbody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Tasumata arveid pole</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(d => `
+    <tr class="${d._isOverdue ? 'row-overdue' : ''}">
+      <td>${escapeHtml(d.PartnerName || '—')}</td>
+      <td>${escapeHtml(d.DocNo || '—')}</td>
+      <td>${formatDate(d.DocDate)}</td>
+      <td>${formatDate(d.DueDate)}</td>
+      <td>${d._daysOver > 0 ? '+' + d._daysOver : (d._daysOver < 0 ? d._daysOver : '0')}</td>
+      <td>${fmt(d.UnPaidAmount)}</td>
+    </tr>
+  `).join('');
+}
+
+function formatDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    debtsFilter = btn.dataset.filter;
+    renderDebts();
+  });
+});
 
 // ── KPI cards ──────────────────────────────────────────────────────
 
