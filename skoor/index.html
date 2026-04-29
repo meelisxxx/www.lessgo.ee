@@ -98,6 +98,9 @@
     .btn-primary:hover { opacity: 0.88; }
     .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
     .error-msg { color: var(--neg); font-size: 13px; margin-top: 12px; }
+    .forgot-link { margin-top: 14px; font-size: 13px; }
+    .forgot-link a { color: var(--text2); text-decoration: none; }
+    .forgot-link a:hover { color: var(--accent); }
 
     /* ── App layout ── */
     #app { display: none; flex-direction: column; min-height: 100vh; }
@@ -130,6 +133,19 @@
       outline: none;
     }
     select:focus { border-color: var(--accent); }
+
+    .btn-pdf {
+      padding: 8px 14px;
+      background: transparent;
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      color: var(--accent);
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .btn-pdf:hover { background: var(--accent); color: #fff; }
 
     .btn-logout {
       padding: 8px 16px;
@@ -250,6 +266,28 @@
 
     .loading { color: var(--text2); font-size: 14px; padding: 20px 0; }
 
+    /* ── Print / PDF ── */
+    @media print {
+      body { background: #fff; color: #000; }
+      header, .btn-pdf, .btn-logout, #client-select, #period-select { display: none !important; }
+      .card { background: #fff; border: 1px solid #ddd; break-inside: avoid; }
+      .kpi-grid { grid-template-columns: repeat(5, 1fr); }
+      .kpi-card { background: #f9f9f9; border: 1px solid #ddd; }
+      .kpi-label { color: #666; }
+      .kpi-value { color: #000; font-size: 18px; }
+      .kpi-delta { color: #444; }
+      .chart-wrap { height: 200px; }
+      .detail-grid { grid-template-columns: 1fr 1fr; }
+      .page-title h2 { color: #000; }
+      .period-badge { color: #666; border-color: #ddd; }
+      .card h3 { color: #444; }
+      table td, table th { color: #000; border-color: #eee; }
+      .row-section td { color: #10b981; }
+      .val-neg { color: #dc2626; }
+      .val-pos { color: #16a34a; }
+      a { display: none; }
+    }
+
     /* ── Mobiilivaade ── */
     @media (max-width: 900px) {
       .kpi-grid { grid-template-columns: repeat(3, 1fr); }
@@ -285,7 +323,15 @@
       <input type="password" id="password" placeholder="Parool" autocomplete="current-password" required>
       <button type="submit" class="btn-primary" id="login-btn">Logi sisse</button>
       <p class="error-msg" id="login-error"></p>
+      <p class="forgot-link"><a href="#" id="forgot-link">Unustasid parooli?</a></p>
     </form>
+    <div id="reset-form" style="display:none">
+      <p class="auth-subtitle" style="margin-bottom:16px">Sisesta e-posti aadress — saadame parooli lähtestamise lingi.</p>
+      <input type="email" id="reset-email" placeholder="E-posti aadress" autocomplete="email">
+      <button class="btn-primary" id="reset-btn">Saada link</button>
+      <p class="error-msg" id="reset-msg"></p>
+      <p class="forgot-link"><a href="#" id="back-to-login">← Tagasi sisselogimisse</a></p>
+    </div>
   </div>
 </div>
 
@@ -299,6 +345,7 @@
     <div class="header-right">
       <select id="client-select" style="display:none"></select>
       <select id="period-select"></select>
+      <button class="btn-pdf" id="pdf-btn" onclick="window.print()">⬇ Salvesta PDF</button>
       <button class="btn-logout" id="logout-btn">Logi välja</button>
     </div>
   </header>
@@ -470,6 +517,44 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 document.getElementById('logout-btn').addEventListener('click', () =>
   sb.auth.signOut()
 );
+
+// ── Parool reset ───────────────────────────────────────────────────
+
+document.getElementById('forgot-link').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('login-form').style.display = 'none';
+  document.getElementById('reset-form').style.display = 'block';
+  const em = document.getElementById('email').value;
+  if (em) document.getElementById('reset-email').value = em;
+});
+
+document.getElementById('back-to-login').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('reset-form').style.display = 'none';
+  document.getElementById('login-form').style.display = 'block';
+  document.getElementById('reset-msg').textContent = '';
+});
+
+document.getElementById('reset-btn').addEventListener('click', async () => {
+  const email = document.getElementById('reset-email').value.trim();
+  const msg   = document.getElementById('reset-msg');
+  const btn   = document.getElementById('reset-btn');
+  if (!email) { msg.textContent = 'Sisesta e-posti aadress.'; return; }
+  btn.disabled = true;
+  btn.textContent = 'Saadan...';
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname,
+  });
+  btn.disabled = false;
+  btn.textContent = 'Saada link';
+  if (error) {
+    msg.style.color = 'var(--neg)';
+    msg.textContent = 'Viga: ' + error.message;
+  } else {
+    msg.style.color = 'var(--pos)';
+    msg.textContent = 'Link saadetud! Kontrolli oma postkasti.';
+  }
+});
 
 // ── Init ───────────────────────────────────────────────────────────
 
