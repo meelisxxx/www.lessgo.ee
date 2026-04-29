@@ -134,7 +134,7 @@
     }
     select:focus { border-color: var(--accent); }
 
-    .btn-pdf {
+    .btn-pdf, .btn-refresh {
       padding: 8px 14px;
       background: transparent;
       border: 1px solid var(--accent);
@@ -145,7 +145,10 @@
       cursor: pointer;
       transition: background 0.2s, color 0.2s;
     }
-    .btn-pdf:hover { background: var(--accent); color: #fff; }
+    .btn-pdf:hover, .btn-refresh:hover { background: var(--accent); color: #fff; }
+    .btn-refresh:disabled { opacity: 0.6; cursor: wait; }
+    .btn-refresh.success { background: var(--pos); color: #fff; border-color: var(--pos); }
+    .btn-refresh.error { background: var(--neg); color: #fff; border-color: var(--neg); }
 
     .btn-logout {
       padding: 8px 16px;
@@ -292,7 +295,7 @@
     /* ── Print / PDF ── */
     @media print {
       body { background: #fff; color: #000; }
-      header, .btn-pdf, .btn-logout, #client-select, #period-select, .filter-bar { display: none !important; }
+      header, .btn-pdf, .btn-refresh, .btn-logout, #client-select, #period-select, .filter-bar { display: none !important; }
       .card { background: #fff; border: 1px solid #ddd; break-inside: avoid; }
       .kpi-grid { grid-template-columns: repeat(5, 1fr); }
       .kpi-card { background: #f9f9f9; border: 1px solid #ddd; }
@@ -368,6 +371,7 @@
     <div class="header-right">
       <select id="client-select" style="display:none"></select>
       <select id="period-select"></select>
+      <button class="btn-refresh" id="refresh-btn" style="display:none">⟳ Uuenda</button>
       <button class="btn-pdf" id="pdf-btn" onclick="window.print()">⬇ Salvesta PDF</button>
       <button class="btn-logout" id="logout-btn">Logi välja</button>
     </div>
@@ -488,6 +492,8 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
+const REFRESH_WEBHOOK_URL = 'https://n8n.lessgo.ee/webhook/skoor/refresh';
+
 let isAdmin = false;
 let selectedClientId = null;
 let selectedPeriod   = null;
@@ -579,6 +585,55 @@ document.getElementById('logout-btn').addEventListener('click', () =>
   sb.auth.signOut()
 );
 
+// ── Admin "Uuenda" ─────────────────────────────────────────────────
+
+document.getElementById('refresh-btn').addEventListener('click', async () => {
+  if (!selectedClientId) return;
+  const btn = document.getElementById('refresh-btn');
+  const orig = btn.textContent;
+
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { alert('Sa pole sisse logitud'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '⟳ Uuendan...';
+  btn.classList.remove('success', 'error');
+
+  try {
+    const res = await fetch(REFRESH_WEBHOOK_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ client_id: selectedClientId }),
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data.message || `HTTP ${res.status}`);
+    }
+
+    btn.textContent = '✓ Uuendatud';
+    btn.classList.add('success');
+    await loadDashboard();
+
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.disabled = false;
+      btn.classList.remove('success');
+    }, 2500);
+  } catch (e) {
+    btn.textContent = '✗ ' + (e.message || 'Viga').substring(0, 30);
+    btn.classList.add('error');
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.disabled = false;
+      btn.classList.remove('error');
+    }, 4000);
+  }
+});
+
 // ── Parool reset ───────────────────────────────────────────────────
 
 document.getElementById('forgot-link').addEventListener('click', (e) => {
@@ -636,6 +691,10 @@ async function onLogin(user) {
 
   const { data: clients } = await sb.from('clients').select('*').order('name');
   const clientSel = document.getElementById('client-select');
+
+  if (isAdmin) {
+    document.getElementById('refresh-btn').style.display = 'block';
+  }
 
   if (isAdmin && clients?.length > 1) {
     clientSel.innerHTML = clients.map(c =>
