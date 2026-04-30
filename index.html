@@ -1,12 +1,33 @@
 <!DOCTYPE html>
 <html lang="et">
 <head>
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7EZD0M2S3D"></script>
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-7EZD0M2S3D');
+      // GDPR — Google Analytics laetakse alles pärast kasutaja nõusolekut
+      (function(){
+        function getCookie(name){
+          var m = document.cookie.match('(?:^|;)\\s*'+name+'=([^;]*)');
+          return m ? m[1] : null;
+        }
+        function setCookie(name, value, days){
+          var d = new Date();
+          d.setTime(d.getTime() + days*24*60*60*1000);
+          document.cookie = name+'='+value+';expires='+d.toUTCString()+';path=/;SameSite=Lax;Secure';
+        }
+        function loadGA(){
+          if (window.__gaLoaded) return;
+          window.__gaLoaded = true;
+          var s = document.createElement('script');
+          s.async = true;
+          s.src = 'https://www.googletagmanager.com/gtag/js?id=G-7EZD0M2S3D';
+          document.head.appendChild(s);
+          window.dataLayer = window.dataLayer || [];
+          window.gtag = function(){ dataLayer.push(arguments); };
+          gtag('js', new Date());
+          gtag('config', 'G-7EZD0M2S3D', { anonymize_ip: true });
+        }
+        window.lessgoConsent = { get: getCookie, set: setCookie, loadGA: loadGA };
+        if (getCookie('lessgo-consent') === 'accepted') loadGA();
+      })();
     </script>
 
     <meta name="description" content="LessGo pakub kaasaegset automatiseeritud ja paberivaba raamatupidamist. AI-põhised lahendused, dokumentide digitaliseerimine ja töövoogude automatiseerimine.">
@@ -239,6 +260,46 @@
             font-size: 0.9em;
         }
         .linkedin-link:hover { opacity: 0.9; }
+
+        /* GDPR cookie banner */
+        #cookie-banner {
+            display: none;
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: #1a1a1a;
+            border-top: 1px solid #444;
+            padding: 18px 20px;
+            z-index: 2000;
+            color: #ddd;
+            font-size: 0.92em;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
+        }
+        #cookie-banner .cb-inner {
+            max-width: 900px;
+            margin: 0 auto;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 14px;
+            justify-content: space-between;
+        }
+        #cookie-banner p { margin: 0; flex: 1 1 320px; color: #bbb; line-height: 1.5; }
+        #cookie-banner .cb-buttons { display: flex; gap: 10px; }
+        #cookie-banner button {
+            width: auto;
+            padding: 10px 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+        #cookie-banner button.cb-reject {
+            background: transparent;
+            color: #ccc;
+            border: 1px solid #555;
+        }
+        #cookie-banner button.cb-reject:hover {
+            background: rgba(255,255,255,0.05);
+            transform: none;
+        }
     </style>
 </head>
 <body>
@@ -275,15 +336,15 @@
                 <form id="contact-form" action="https://api.lessgo.ee/webhook/kontaktivorm" method="POST">
     <div class="form-group">
         <label for="name">Nimi</label>
-        <input type="text" id="name" name="nimi" required placeholder="Sinu nimi" maxlength="100">
+        <input type="text" id="name" name="nimi" required placeholder="Sinu nimi" maxlength="100" autocomplete="name">
     </div>
     <div class="form-group">
         <label for="company">Ettevõtte nimi</label>
-        <input type="text" id="company" name="ettevote" placeholder="Ettevõte OÜ" maxlength="200">
+        <input type="text" id="company" name="ettevote" placeholder="Ettevõte OÜ" maxlength="200" autocomplete="organization">
     </div>
     <div class="form-group">
         <label for="email">E-posti aadress</label>
-        <input type="email" id="email" name="email" required placeholder="sinu@email.ee" maxlength="200">
+        <input type="email" id="email" name="email" required placeholder="sinu@email.ee" maxlength="200" autocomplete="email">
     </div>
     <div class="form-group">
         <label for="message">Sinu päring</label>
@@ -344,7 +405,7 @@
                 E-post: <a href="mailto:meelis@lessgo.ee">meelis@lessgo.ee</a>
             </p>
 
-            <a href="https://www.linkedin.com/in/meelisvarend/" target="_blank" class="linkedin-link">
+            <a href="https://www.linkedin.com/in/meelisvarend/" target="_blank" rel="noopener noreferrer" class="linkedin-link">
                 LinkedIn profiil
             </a>
 
@@ -352,9 +413,37 @@
         </footer>
     </div>
 
-    <a href="https://wa.me/3725140785?text=Tere!%20Soovin%20LessGo%20abiga%20asjad%20liikuma%20panna." class="whatsapp-float" target="_blank">
+    <a href="https://wa.me/3725140785?text=Tere!%20Soovin%20LessGo%20abiga%20asjad%20liikuma%20panna." class="whatsapp-float" target="_blank" rel="noopener noreferrer">
       <span style="font-family: Arial, sans-serif;">💬</span>
     </a>
+
+    <!-- GDPR cookie consent banner -->
+    <div id="cookie-banner" role="dialog" aria-label="Küpsiste nõusolek">
+        <div class="cb-inner">
+            <p>Kasutame Google Analyticsi, et mõista lehe kasutust ja seda parandada. Sinu valik salvestatakse 1 aastaks.</p>
+            <div class="cb-buttons">
+                <button type="button" class="cb-reject" id="cookie-reject">Keeldun</button>
+                <button type="button" id="cookie-accept">Nõustun</button>
+            </div>
+        </div>
+    </div>
+    <script>
+      (function(){
+        var banner = document.getElementById('cookie-banner');
+        if (!window.lessgoConsent.get('lessgo-consent')) {
+          banner.style.display = 'block';
+        }
+        document.getElementById('cookie-accept').addEventListener('click', function(){
+          window.lessgoConsent.set('lessgo-consent', 'accepted', 365);
+          banner.style.display = 'none';
+          window.lessgoConsent.loadGA();
+        });
+        document.getElementById('cookie-reject').addEventListener('click', function(){
+          window.lessgoConsent.set('lessgo-consent', 'rejected', 365);
+          banner.style.display = 'none';
+        });
+      })();
+    </script>
 
 </body>
 </html>
