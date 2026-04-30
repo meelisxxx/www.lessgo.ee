@@ -72,6 +72,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
 
+    <!-- Cloudflare Turnstile (bot kaitse) -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+
     <style>
         body {
             background-color: #333333;
@@ -351,6 +354,7 @@
         <textarea id="message" name="paring" rows="5" required placeholder="Kuidas saame sulle kasulikud olla?" maxlength="5000"></textarea>
     </div>
     <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;height:0;width:0;opacity:0;pointer-events:none">
+    <div class="cf-turnstile" data-sitekey="0x4AAAAAADGdnVFCoHg9FXJH" data-theme="dark" data-size="flexible" style="margin-bottom:20px;"></div>
     <button type="submit" title="Saada raamatupidamisteenuse päring LessGo-le">Saada päring</button>
 </form>
 <div id="form-status" role="status" aria-live="polite"></div>
@@ -367,12 +371,23 @@
     status.textContent = '';
     status.className = '';
 
+    var turnstileEl = form.elements['cf-turnstile-response'];
+    var turnstileToken = turnstileEl ? turnstileEl.value : '';
+    if (!turnstileToken) {
+      status.textContent = 'Palun oota — turvakontroll laeb. Proovi paari sekundi pärast uuesti.';
+      status.className = 'form-error';
+      btn.disabled = false;
+      btn.textContent = origLabel;
+      return;
+    }
+
     var data = {
-      nimi:     form.nimi.value.trim(),
-      ettevote: form.ettevote.value.trim(),
-      email:    form.email.value.trim(),
-      paring:   form.paring.value.trim(),
-      website:  form.website.value
+      nimi:           form.nimi.value.trim(),
+      ettevote:       form.ettevote.value.trim(),
+      email:          form.email.value.trim(),
+      paring:         form.paring.value.trim(),
+      website:        form.website.value,
+      turnstile_token: turnstileToken
     };
 
     try {
@@ -393,6 +408,10 @@
       status.className   = 'form-error';
       btn.disabled = false;
       btn.textContent = origLabel;
+      // Lähtesta Turnstile uue token'i jaoks
+      if (window.turnstile && typeof window.turnstile.reset === 'function') {
+        try { window.turnstile.reset(); } catch (e) {}
+      }
     }
   });
 })();
