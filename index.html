@@ -132,6 +132,26 @@
             box-shadow: 0 4px 20px rgba(0,0,0,0.2);
         }
 
+        #form-status {
+            margin-top: 16px;
+            padding: 14px 16px;
+            border-radius: 8px;
+            font-size: 0.95em;
+            display: none;
+        }
+        #form-status.form-success {
+            display: block;
+            background: rgba(16,185,129,0.12);
+            border: 1px solid rgba(16,185,129,0.4);
+            color: #10b981;
+        }
+        #form-status.form-error {
+            display: block;
+            background: rgba(239,68,68,0.12);
+            border: 1px solid rgba(239,68,68,0.4);
+            color: #ef4444;
+        }
+
         .form-group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; color: #bbb; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; }
         
@@ -252,25 +272,70 @@
         <section class="contact-section">
             <h2>Võta ühendust</h2>
             <div class="contact-form">
-                <form action="https://api.lessgo.ee/webhook/kontaktivorm" method="POST">
+                <form id="contact-form" action="https://api.lessgo.ee/webhook/kontaktivorm" method="POST">
     <div class="form-group">
         <label for="name">Nimi</label>
-        <input type="text" id="name" name="nimi" required placeholder="Sinu nimi">
+        <input type="text" id="name" name="nimi" required placeholder="Sinu nimi" maxlength="100">
     </div>
     <div class="form-group">
         <label for="company">Ettevõtte nimi</label>
-        <input type="text" id="company" name="ettevote" placeholder="Ettevõte OÜ">
+        <input type="text" id="company" name="ettevote" placeholder="Ettevõte OÜ" maxlength="200">
     </div>
     <div class="form-group">
         <label for="email">E-posti aadress</label>
-        <input type="email" id="email" name="email" required placeholder="sinu@email.ee">
+        <input type="email" id="email" name="email" required placeholder="sinu@email.ee" maxlength="200">
     </div>
     <div class="form-group">
         <label for="message">Sinu päring</label>
-        <textarea id="message" name="paring" rows="5" required placeholder="Kuidas saame sulle kasulikud olla?"></textarea>
+        <textarea id="message" name="paring" rows="5" required placeholder="Kuidas saame sulle kasulikud olla?" maxlength="5000"></textarea>
     </div>
+    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;height:0;width:0;opacity:0;pointer-events:none">
     <button type="submit" title="Saada raamatupidamisteenuse päring LessGo-le">Saada päring</button>
 </form>
+<div id="form-status" role="status" aria-live="polite"></div>
+<script>
+(function(){
+  var form = document.getElementById('contact-form');
+  var status = document.getElementById('form-status');
+  form.addEventListener('submit', async function(e){
+    e.preventDefault();
+    var btn = form.querySelector('button[type=submit]');
+    var origLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Saadan...';
+    status.textContent = '';
+    status.className = '';
+
+    var data = {
+      nimi:     form.nimi.value.trim(),
+      ettevote: form.ettevote.value.trim(),
+      email:    form.email.value.trim(),
+      paring:   form.paring.value.trim(),
+      website:  form.website.value
+    };
+
+    try {
+      var res = await fetch(form.action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      var json = await res.json().catch(function(){ return {}; });
+      if (!res.ok || json.ok === false) {
+        throw new Error(json.message || 'Saatmine ebaõnnestus');
+      }
+      form.style.display = 'none';
+      status.textContent = 'Aitäh! Sinu päring on saadetud. Vastame esimesel võimalusel.';
+      status.className   = 'form-success';
+    } catch (err) {
+      status.textContent = 'Viga: ' + (err.message || 'Tundmatu viga');
+      status.className   = 'form-error';
+      btn.disabled = false;
+      btn.textContent = origLabel;
+    }
+  });
+})();
+</script>
             </div>
         </section>
 
