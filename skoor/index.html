@@ -364,10 +364,10 @@
 <!-- ═══════════════════════════ APP ════════════════════════════════ -->
 <div id="app">
   <header>
-    <div class="header-left">
+    <a href="https://lessgo.ee" class="header-left" style="text-decoration:none;color:inherit;">
       <img src="../Logo.png" alt="LessGo" class="header-logo">
       <span class="header-title">Skoor</span>
-    </div>
+    </a>
     <div class="header-right">
       <select id="client-select" style="display:none"></select>
       <select id="period-select"></select>
@@ -436,12 +436,12 @@
       </table></div>
     </div>
 
-    <!-- Tasumata arved -->
+    <!-- Laekumata arved -->
     <div class="card">
-      <h3>Tasumata arved <span class="muted" id="debts-snapshot"></span></h3>
+      <h3>Laekumata arved <span class="muted" id="debts-snapshot"></span></h3>
       <div class="kpi-grid debts-kpi">
         <div class="kpi-card">
-          <div class="kpi-label">Tasumata kokku</div>
+          <div class="kpi-label">Laekumata kokku</div>
           <div class="kpi-value" id="debts-total">—</div>
           <div class="kpi-delta neutral" id="debts-count">—</div>
         </div>
@@ -464,7 +464,7 @@
               <th>Kuupäev</th>
               <th>Tähtaeg</th>
               <th>Päevi</th>
-              <th>Tasumata</th>
+              <th>Laekumata</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -704,13 +704,13 @@ async function onLogin(user) {
     selectedClientId = clients[0].id;
     document.getElementById('client-name').textContent = clients[0].name;
 
-    clientSel.addEventListener('change', async () => {
+    clientSel.onchange = async () => {
       selectedClientId = clientSel.value;
       const c = clients.find(x => x.id === selectedClientId);
       document.getElementById('client-name').textContent = c?.name || '';
       await loadPeriods(selectedClientId);
       await loadDashboard();
-    });
+    };
   } else {
     const { data: uc } = await sb.from('user_clients').select('client_id, clients(name)').eq('user_id', user.id);
     selectedClientId = uc?.[0]?.client_id;
@@ -847,7 +847,7 @@ function renderDebts() {
 
   const tbody = document.querySelector('#debts-table tbody');
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Tasumata arveid pole</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Laekumata arveid pole</td></tr>';
     return;
   }
 
