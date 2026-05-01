@@ -828,13 +828,25 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   btn.textContent = t('auth.signing_in');
   err.textContent = '';
 
-  const { error } = await sb.auth.signInWithPassword({
-    email:    document.getElementById('email').value.trim(),
-    password: document.getElementById('password').value,
-  });
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  console.log('[skoor] login attempt:', email, 'pwd len', password.length);
 
-  if (error) {
-    err.textContent = t('auth.invalid');
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) {
+      console.error('[skoor] login error:', error.code, error.message, error);
+      const isInvalid = (error.code === 'invalid_credentials')
+                     || /invalid|credential/i.test(error.message || '');
+      err.textContent = isInvalid ? t('auth.invalid') : `${t('auth.error_prefix')}${error.message}`;
+      btn.disabled = false;
+      btn.textContent = t('auth.signin');
+    } else {
+      console.log('[skoor] login OK:', data?.user?.email);
+    }
+  } catch (ex) {
+    console.error('[skoor] login exception:', ex);
+    err.textContent = `${t('auth.error_prefix')}${ex.message || 'Unknown'}`;
     btn.disabled = false;
     btn.textContent = t('auth.signin');
   }
