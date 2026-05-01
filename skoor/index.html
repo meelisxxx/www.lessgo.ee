@@ -163,6 +163,31 @@
     }
     .btn-logout:hover { border-color: var(--neg); color: var(--neg); }
 
+    /* ── Language switcher (segment control) ── */
+    .lang-switcher {
+      display: inline-flex;
+      gap: 0;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2px;
+    }
+    .lang-btn {
+      padding: 5px 10px;
+      background: transparent;
+      border: none;
+      border-radius: 5px;
+      color: var(--text2);
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .lang-btn:hover:not(.active) { color: var(--text); }
+    .lang-btn.active { background: var(--accent); color: #fff; }
+
     main { padding: 28px 24px; max-width: 1200px; margin: 0 auto; width: 100%; }
 
     .page-title {
@@ -295,7 +320,7 @@
     /* ── Print / PDF ── */
     @media print {
       body { background: #fff; color: #000; }
-      header, .btn-pdf, .btn-refresh, .btn-logout, #client-select, #period-select, .filter-bar { display: none !important; }
+      header, .btn-pdf, .btn-refresh, .btn-logout, .lang-switcher, #client-select, #period-select, .filter-bar { display: none !important; }
       .card { background: #fff; border: 1px solid #ddd; break-inside: avoid; }
       .kpi-grid { grid-template-columns: repeat(5, 1fr); }
       .kpi-card { background: #f9f9f9; border: 1px solid #ddd; }
@@ -343,20 +368,25 @@
   <div class="auth-card">
     <img src="../Logo.png" alt="LessGo" class="auth-logo">
     <h1>Skoor</h1>
-    <p class="auth-subtitle">Finantsiülevaade</p>
+    <p class="auth-subtitle" data-i18n="auth.subtitle">Finantsiülevaade</p>
+    <div class="lang-switcher" style="margin-bottom:24px;">
+      <button type="button" class="lang-btn" data-lang="et">ET</button>
+      <button type="button" class="lang-btn" data-lang="en">EN</button>
+      <button type="button" class="lang-btn" data-lang="sv">SV</button>
+    </div>
     <form id="login-form">
-      <input type="email"    id="email"    placeholder="E-posti aadress" autocomplete="email" required>
-      <input type="password" id="password" placeholder="Parool" autocomplete="current-password" required>
-      <button type="submit" class="btn-primary" id="login-btn">Logi sisse</button>
+      <input type="email"    id="email"    placeholder="E-posti aadress" data-i18n-placeholder="auth.email" autocomplete="email" required>
+      <input type="password" id="password" placeholder="Parool" data-i18n-placeholder="auth.password" autocomplete="current-password" required>
+      <button type="submit" class="btn-primary" id="login-btn" data-i18n="auth.signin">Logi sisse</button>
       <p class="error-msg" id="login-error"></p>
-      <p class="forgot-link"><a href="#" id="forgot-link">Unustasid parooli?</a></p>
+      <p class="forgot-link"><a href="#" id="forgot-link" data-i18n="auth.forgot">Unustasid parooli?</a></p>
     </form>
     <div id="reset-form" style="display:none">
-      <p class="auth-subtitle" style="margin-bottom:16px">Sisesta e-posti aadress — saadame parooli lähtestamise lingi.</p>
-      <input type="email" id="reset-email" placeholder="E-posti aadress" autocomplete="email">
-      <button class="btn-primary" id="reset-btn">Saada link</button>
+      <p class="auth-subtitle" style="margin-bottom:16px" data-i18n="auth.reset_intro">Sisesta e-posti aadress — saadame parooli lähtestamise lingi.</p>
+      <input type="email" id="reset-email" placeholder="E-posti aadress" data-i18n-placeholder="auth.email" autocomplete="email">
+      <button class="btn-primary" id="reset-btn" data-i18n="auth.send_link">Saada link</button>
       <p class="error-msg" id="reset-msg"></p>
-      <p class="forgot-link"><a href="#" id="back-to-login">← Tagasi sisselogimisse</a></p>
+      <p class="forgot-link"><a href="#" id="back-to-login" data-i18n="auth.back">← Tagasi sisselogimisse</a></p>
     </div>
   </div>
 </div>
@@ -371,9 +401,13 @@
     <div class="header-right">
       <select id="client-select" style="display:none"></select>
       <select id="period-select"></select>
-      <button class="btn-refresh" id="refresh-btn" style="display:none">⟳ Uuenda</button>
-      <button class="btn-pdf" id="pdf-btn" onclick="window.print()">⬇ Salvesta PDF</button>
-      <button class="btn-logout" id="logout-btn">Logi välja</button>
+      <button class="btn-refresh" id="refresh-btn" style="display:none" data-i18n="btn.refresh">⟳ Uuenda</button>
+      <div class="lang-switcher">
+        <button type="button" class="lang-btn" data-lang="et">ET</button>
+        <button type="button" class="lang-btn" data-lang="en">EN</button>
+        <button type="button" class="lang-btn" data-lang="sv">SV</button>
+      </div>
+      <button class="btn-logout" id="logout-btn" data-i18n="auth.signout">Logi välja</button>
     </div>
   </header>
 
@@ -386,27 +420,27 @@
     <!-- KPI -->
     <div class="kpi-grid">
       <div class="kpi-card" id="kpi-kaive">
-        <div class="kpi-label">Käive</div>
+        <div class="kpi-label" data-i18n="kpi.revenue">Käive</div>
         <div class="kpi-value">—</div>
-        <div class="kpi-delta neutral">Laen...</div>
+        <div class="kpi-delta neutral" data-i18n="common.loading">Laen...</div>
       </div>
       <div class="kpi-card" id="kpi-arikasum">
-        <div class="kpi-label">Ärikasum</div>
+        <div class="kpi-label" data-i18n="kpi.operating_income">Ärikasum</div>
         <div class="kpi-value">—</div>
-        <div class="kpi-delta neutral">Laen...</div>
+        <div class="kpi-delta neutral" data-i18n="common.loading">Laen...</div>
       </div>
       <div class="kpi-card" id="kpi-netkasum">
-        <div class="kpi-label">Nettokasum</div>
+        <div class="kpi-label" data-i18n="kpi.net_income">Nettokasum</div>
         <div class="kpi-value">—</div>
-        <div class="kpi-delta neutral">Laen...</div>
+        <div class="kpi-delta neutral" data-i18n="common.loading">Laen...</div>
       </div>
       <div class="kpi-card" id="kpi-omakapital">
-        <div class="kpi-label">Omakapital</div>
+        <div class="kpi-label" data-i18n="kpi.equity">Omakapital</div>
         <div class="kpi-value">—</div>
         <div class="kpi-delta neutral">—</div>
       </div>
       <div class="kpi-card" id="kpi-marginaal">
-        <div class="kpi-label">Kasumimarginaal</div>
+        <div class="kpi-label" data-i18n="kpi.profit_margin">Kasumimarginaal</div>
         <div class="kpi-value">—</div>
         <div class="kpi-delta neutral">—</div>
       </div>
@@ -414,7 +448,7 @@
 
     <!-- Trend chart -->
     <div class="card">
-      <h3>Käibe ja kasumi trend</h3>
+      <h3 data-i18n="chart.title">Käibe ja kasumi trend</h3>
       <div class="chart-wrap">
         <canvas id="trend-chart"></canvas>
       </div>
@@ -422,14 +456,14 @@
 
     <!-- Comparison -->
     <div class="card">
-      <h3>Võrdlus perioodidega</h3>
+      <h3 data-i18n="comparison.title">Võrdlus perioodidega</h3>
       <div class="comparison-scroll"><table id="comparison-table">
         <thead>
           <tr>
-            <th>Näitaja</th>
-            <th id="col-current">Valitud kuu</th>
-            <th>Eelmine kuu</th>
-            <th>Eelmine aasta</th>
+            <th data-i18n="comparison.metric">Näitaja</th>
+            <th id="col-current">—</th>
+            <th data-i18n="comparison.prev_month">Eelmine kuu</th>
+            <th data-i18n="comparison.prev_year">Eelmine aasta</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -438,33 +472,33 @@
 
     <!-- Laekumata arved -->
     <div class="card">
-      <h3>Laekumata arved <span class="muted" id="debts-snapshot"></span></h3>
+      <h3><span data-i18n="debts.title">Laekumata arved</span> <span class="muted" id="debts-snapshot"></span></h3>
       <div class="kpi-grid debts-kpi">
         <div class="kpi-card">
-          <div class="kpi-label">Laekumata kokku</div>
+          <div class="kpi-label" data-i18n="debts.total">Laekumata kokku</div>
           <div class="kpi-value" id="debts-total">—</div>
           <div class="kpi-delta neutral" id="debts-count">—</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">Üle tähtaja</div>
+          <div class="kpi-label" data-i18n="debts.overdue">Üle tähtaja</div>
           <div class="kpi-value" id="debts-overdue">—</div>
           <div class="kpi-delta neutral" id="debts-overdue-count">—</div>
         </div>
       </div>
       <div class="filter-bar">
-        <button class="filter-btn active" data-filter="all">Kõik</button>
-        <button class="filter-btn" data-filter="overdue">Ainult üle tähtaja</button>
+        <button class="filter-btn active" data-filter="all" data-i18n="debts.filter_all">Kõik</button>
+        <button class="filter-btn" data-filter="overdue" data-i18n="debts.filter_overdue">Ainult üle tähtaja</button>
       </div>
       <div class="debts-scroll">
         <table id="debts-table">
           <thead>
             <tr>
-              <th>Klient</th>
-              <th>Dokument</th>
-              <th>Kuupäev</th>
-              <th>Tähtaeg</th>
-              <th>Päevi</th>
-              <th>Laekumata</th>
+              <th data-i18n="debts.col_client">Klient</th>
+              <th data-i18n="debts.col_doc">Dokument</th>
+              <th data-i18n="debts.col_date">Kuupäev</th>
+              <th data-i18n="debts.col_due">Tähtaeg</th>
+              <th data-i18n="debts.col_days">Päevi</th>
+              <th data-i18n="debts.col_amount">Laekumata</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -475,11 +509,11 @@
     <!-- Detail tables -->
     <div class="detail-grid">
       <div class="card">
-        <h3>Kasumiaruanne</h3>
+        <h3 data-i18n="reports.income_statement">Kasumiaruanne</h3>
         <table><tbody id="ka-tbody"></tbody></table>
       </div>
       <div class="card">
-        <h3>Bilanss</h3>
+        <h3 data-i18n="reports.balance_sheet">Bilanss</h3>
         <table><tbody id="bi-tbody"></tbody></table>
       </div>
     </div>
@@ -501,18 +535,230 @@ let trendChart       = null;
 let allDebts         = [];
 let debtsFilter      = 'all';
 
+// ── i18n ──────────────────────────────────────────────────────────
+const I18N = {
+  et: {
+    'auth.subtitle': 'Finantsiülevaade',
+    'auth.email': 'E-posti aadress',
+    'auth.password': 'Parool',
+    'auth.signin': 'Logi sisse',
+    'auth.signing_in': 'Sisselogimine...',
+    'auth.invalid': 'Vale e-post või parool.',
+    'auth.forgot': 'Unustasid parooli?',
+    'auth.reset_intro': 'Sisesta e-posti aadress — saadame parooli lähtestamise lingi.',
+    'auth.send_link': 'Saada link',
+    'auth.sending': 'Saadan...',
+    'auth.enter_email': 'Sisesta e-posti aadress.',
+    'auth.link_sent': 'Link saadetud! Kontrolli oma postkasti.',
+    'auth.error_prefix': 'Viga: ',
+    'auth.back': '← Tagasi sisselogimisse',
+    'auth.signout': 'Logi välja',
+    'auth.not_signed_in': 'Sa pole sisse logitud',
+    'btn.refresh': '⟳ Uuenda',
+    'btn.refreshing': '⟳ Uuendan...',
+    'btn.refreshed': '✓ Uuendatud',
+    'btn.error': 'Viga',
+    'kpi.revenue': 'Käive',
+    'kpi.operating_income': 'Ärikasum',
+    'kpi.net_income': 'Nettokasum',
+    'kpi.equity': 'Omakapital',
+    'kpi.profit_margin': 'Kasumimarginaal',
+    'common.loading': 'Laen...',
+    'common.no_data': 'Andmeid ei leitud',
+    'common.vs_prev_month': 'vs eelmine kuu',
+    'chart.title': 'Käibe ja kasumi trend',
+    'comparison.title': 'Võrdlus perioodidega',
+    'comparison.metric': 'Näitaja',
+    'comparison.prev_month': 'Eelmine kuu',
+    'comparison.prev_year': 'Eelmine aasta',
+    'debts.title': 'Laekumata arved',
+    'debts.total': 'Laekumata kokku',
+    'debts.overdue': 'Üle tähtaja',
+    'debts.filter_all': 'Kõik',
+    'debts.filter_overdue': 'Ainult üle tähtaja',
+    'debts.col_client': 'Klient',
+    'debts.col_doc': 'Dokument',
+    'debts.col_date': 'Kuupäev',
+    'debts.col_due': 'Tähtaeg',
+    'debts.col_days': 'Päevi',
+    'debts.col_amount': 'Laekumata',
+    'debts.no_unpaid': 'Laekumata arveid pole',
+    'debts.snapshot_prefix': 'seisuga',
+    'debts.count': (v) => `${v.count} arvet`,
+    'reports.income_statement': 'Kasumiaruanne',
+    'reports.balance_sheet': 'Bilanss',
+  },
+  en: {
+    'auth.subtitle': 'Financial Overview',
+    'auth.email': 'Email address',
+    'auth.password': 'Password',
+    'auth.signin': 'Sign in',
+    'auth.signing_in': 'Signing in...',
+    'auth.invalid': 'Invalid email or password.',
+    'auth.forgot': 'Forgot password?',
+    'auth.reset_intro': "Enter your email — we'll send a password reset link.",
+    'auth.send_link': 'Send link',
+    'auth.sending': 'Sending...',
+    'auth.enter_email': 'Enter your email address.',
+    'auth.link_sent': 'Link sent! Check your inbox.',
+    'auth.error_prefix': 'Error: ',
+    'auth.back': '← Back to sign in',
+    'auth.signout': 'Sign out',
+    'auth.not_signed_in': 'You are not signed in',
+    'btn.refresh': '⟳ Refresh',
+    'btn.refreshing': '⟳ Refreshing...',
+    'btn.refreshed': '✓ Updated',
+    'btn.error': 'Error',
+    'kpi.revenue': 'Revenue',
+    'kpi.operating_income': 'Operating Income',
+    'kpi.net_income': 'Net Income',
+    'kpi.equity': 'Equity',
+    'kpi.profit_margin': 'Profit Margin',
+    'common.loading': 'Loading...',
+    'common.no_data': 'No data found',
+    'common.vs_prev_month': 'vs prior month',
+    'chart.title': 'Revenue & Net Income Trend',
+    'comparison.title': 'Period Comparison',
+    'comparison.metric': 'Metric',
+    'comparison.prev_month': 'Previous Month',
+    'comparison.prev_year': 'Previous Year',
+    'debts.title': 'Outstanding Receivables',
+    'debts.total': 'Total Outstanding',
+    'debts.overdue': 'Overdue',
+    'debts.filter_all': 'All',
+    'debts.filter_overdue': 'Overdue only',
+    'debts.col_client': 'Client',
+    'debts.col_doc': 'Document',
+    'debts.col_date': 'Date',
+    'debts.col_due': 'Due date',
+    'debts.col_days': 'Days',
+    'debts.col_amount': 'Outstanding',
+    'debts.no_unpaid': 'No outstanding invoices',
+    'debts.snapshot_prefix': 'as of',
+    'debts.count': (v) => `${v.count} ${v.count === 1 ? 'invoice' : 'invoices'}`,
+    'reports.income_statement': 'Income Statement',
+    'reports.balance_sheet': 'Balance Sheet',
+  },
+  sv: {
+    'auth.subtitle': 'Finansiell översikt',
+    'auth.email': 'E-postadress',
+    'auth.password': 'Lösenord',
+    'auth.signin': 'Logga in',
+    'auth.signing_in': 'Loggar in...',
+    'auth.invalid': 'Felaktig e-post eller lösenord.',
+    'auth.forgot': 'Glömt lösenordet?',
+    'auth.reset_intro': 'Ange din e-postadress — vi skickar en länk för att återställa lösenordet.',
+    'auth.send_link': 'Skicka länk',
+    'auth.sending': 'Skickar...',
+    'auth.enter_email': 'Ange din e-postadress.',
+    'auth.link_sent': 'Länk skickad! Kontrollera din inkorg.',
+    'auth.error_prefix': 'Fel: ',
+    'auth.back': '← Tillbaka till inloggning',
+    'auth.signout': 'Logga ut',
+    'auth.not_signed_in': 'Du är inte inloggad',
+    'btn.refresh': '⟳ Uppdatera',
+    'btn.refreshing': '⟳ Uppdaterar...',
+    'btn.refreshed': '✓ Uppdaterat',
+    'btn.error': 'Fel',
+    'kpi.revenue': 'Omsättning',
+    'kpi.operating_income': 'Rörelseresultat',
+    'kpi.net_income': 'Nettoresultat',
+    'kpi.equity': 'Eget kapital',
+    'kpi.profit_margin': 'Vinstmarginal',
+    'common.loading': 'Laddar...',
+    'common.no_data': 'Inga data hittades',
+    'common.vs_prev_month': 'jämfört med föregående månad',
+    'chart.title': 'Omsättnings- och resultattrend',
+    'comparison.title': 'Periodjämförelse',
+    'comparison.metric': 'Mått',
+    'comparison.prev_month': 'Föregående månad',
+    'comparison.prev_year': 'Föregående år',
+    'debts.title': 'Utestående fakturor',
+    'debts.total': 'Totalt utestående',
+    'debts.overdue': 'Förfallna',
+    'debts.filter_all': 'Alla',
+    'debts.filter_overdue': 'Endast förfallna',
+    'debts.col_client': 'Kund',
+    'debts.col_doc': 'Dokument',
+    'debts.col_date': 'Datum',
+    'debts.col_due': 'Förfallodatum',
+    'debts.col_days': 'Dagar',
+    'debts.col_amount': 'Utestående',
+    'debts.no_unpaid': 'Inga utestående fakturor',
+    'debts.snapshot_prefix': 'per',
+    'debts.count': (v) => `${v.count} ${v.count === 1 ? 'faktura' : 'fakturor'}`,
+    'reports.income_statement': 'Resultaträkning',
+    'reports.balance_sheet': 'Balansräkning',
+  },
+};
+
+const LOCALES = { et: 'et-EE', en: 'en-US', sv: 'sv-SE' };
+
+let currentLang = localStorage.getItem('skoor-lang') || 'et';
+if (!I18N[currentLang]) currentLang = 'et';
+
+function t(key, vars = {}) {
+  const dict = I18N[currentLang] || I18N.et;
+  let val = dict[key];
+  if (val == null) val = I18N.et[key];
+  if (val == null) return key;
+  if (typeof val === 'function') return val(vars);
+  return String(val).replace(/\{(\w+)\}/g, (_, k) => vars[k] != null ? vars[k] : '');
+}
+
+function applyTranslations() {
+  document.documentElement.lang = currentLang;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === currentLang);
+  });
+}
+
+async function setLang(lang) {
+  if (!I18N[lang] || lang === currentLang) {
+    // Sync active state on initial load even if no change
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.lang === currentLang);
+    });
+    return;
+  }
+  currentLang = lang;
+  localStorage.setItem('skoor-lang', lang);
+  applyTranslations();
+  // Re-render dünaamiline sisu uue keelega
+  if (selectedClientId && selectedPeriod) {
+    await loadDashboard();
+  }
+}
+
+// Lang-switcher click handlers (mõlemad: auth ja header)
+document.querySelectorAll('.lang-btn').forEach(btn => {
+  btn.addEventListener('click', () => setLang(btn.dataset.lang));
+});
+
+// Algne tõlge
+applyTranslations();
+
 // ── Helpers ────────────────────────────────────────────────────────
 
 const fmt = (v) =>
   v == null ? '—' :
-  new Intl.NumberFormat('et-EE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v) + ' €';
+  new Intl.NumberFormat(LOCALES[currentLang], { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v) + ' €';
+
+const fmtPct = (v, decimals = 1) =>
+  new Intl.NumberFormat(LOCALES[currentLang], { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(v);
 
 const fmtDelta = (curr, prev) => {
   if (prev == null || prev === 0) return { text: '—', cls: 'neutral' };
   const pct = ((curr - prev) / Math.abs(prev)) * 100;
   const sign = pct >= 0 ? '+' : '';
   return {
-    text: `${sign}${pct.toFixed(1)}% vs eelmine kuu`,
+    text: `${sign}${fmtPct(pct)}% ${t('common.vs_prev_month')}`,
     cls: pct >= 0 ? 'up' : 'down'
   };
 };
@@ -566,7 +812,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   const btn = document.getElementById('login-btn');
   const err = document.getElementById('login-error');
   btn.disabled = true;
-  btn.textContent = 'Sisselogimine...';
+  btn.textContent = t('auth.signing_in');
   err.textContent = '';
 
   const { error } = await sb.auth.signInWithPassword({
@@ -575,9 +821,9 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   });
 
   if (error) {
-    err.textContent = 'Vale e-post või parool.';
+    err.textContent = t('auth.invalid');
     btn.disabled = false;
-    btn.textContent = 'Logi sisse';
+    btn.textContent = t('auth.signin');
   }
 });
 
@@ -590,13 +836,12 @@ document.getElementById('logout-btn').addEventListener('click', () =>
 document.getElementById('refresh-btn').addEventListener('click', async () => {
   if (!selectedClientId) return;
   const btn = document.getElementById('refresh-btn');
-  const orig = btn.textContent;
 
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) { alert('Sa pole sisse logitud'); return; }
+  if (!session) { alert(t('auth.not_signed_in')); return; }
 
   btn.disabled = true;
-  btn.textContent = '⟳ Uuendan...';
+  btn.textContent = t('btn.refreshing');
   btn.classList.remove('success', 'error');
 
   try {
@@ -614,20 +859,20 @@ document.getElementById('refresh-btn').addEventListener('click', async () => {
       throw new Error(data.message || `HTTP ${res.status}`);
     }
 
-    btn.textContent = '✓ Uuendatud';
+    btn.textContent = t('btn.refreshed');
     btn.classList.add('success');
     await loadDashboard();
 
     setTimeout(() => {
-      btn.textContent = orig;
+      btn.textContent = t('btn.refresh');
       btn.disabled = false;
       btn.classList.remove('success');
     }, 2500);
   } catch (e) {
-    btn.textContent = '✗ ' + (e.message || 'Viga').substring(0, 30);
+    btn.textContent = '✗ ' + (e.message || t('btn.error')).substring(0, 30);
     btn.classList.add('error');
     setTimeout(() => {
-      btn.textContent = orig;
+      btn.textContent = t('btn.refresh');
       btn.disabled = false;
       btn.classList.remove('error');
     }, 4000);
@@ -655,20 +900,20 @@ document.getElementById('reset-btn').addEventListener('click', async () => {
   const email = document.getElementById('reset-email').value.trim();
   const msg   = document.getElementById('reset-msg');
   const btn   = document.getElementById('reset-btn');
-  if (!email) { msg.textContent = 'Sisesta e-posti aadress.'; return; }
+  if (!email) { msg.textContent = t('auth.enter_email'); return; }
   btn.disabled = true;
-  btn.textContent = 'Saadan...';
+  btn.textContent = t('auth.sending');
   const { error } = await sb.auth.resetPasswordForEmail(email, {
     redirectTo: window.location.origin + window.location.pathname,
   });
   btn.disabled = false;
-  btn.textContent = 'Saada link';
+  btn.textContent = t('auth.send_link');
   if (error) {
     msg.style.color = 'var(--neg)';
-    msg.textContent = 'Viga: ' + error.message;
+    msg.textContent = t('auth.error_prefix') + error.message;
   } else {
     msg.style.color = 'var(--pos)';
-    msg.textContent = 'Link saadetud! Kontrolli oma postkasti.';
+    msg.textContent = t('auth.link_sent');
   }
 });
 
@@ -804,14 +1049,14 @@ async function loadDebts() {
     document.getElementById('debts-count').textContent   = '—';
     document.getElementById('debts-overdue').textContent = '—';
     document.getElementById('debts-overdue-count').textContent = '—';
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Andmeid ei leitud</td></tr>';
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">${t('common.no_data')}</td></tr>`;
     allDebts = [];
     return;
   }
 
   const d = new Date(latest.snapshot_date);
   document.getElementById('debts-snapshot').textContent =
-    `(seisuga ${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()})`;
+    `(${t('debts.snapshot_prefix')} ${formatDate(latest.snapshot_date)})`;
 
   // data võib olla massiiv (õige) või objekt (vana bugi puhul)
   allDebts = Array.isArray(latest.data) ? latest.data
@@ -835,9 +1080,9 @@ function renderDebts() {
   const overdueCount  = enriched.filter(d => d._isOverdue).length;
 
   document.getElementById('debts-total').textContent          = fmt(totalUnpaid);
-  document.getElementById('debts-count').textContent          = `${enriched.length} arvet`;
+  document.getElementById('debts-count').textContent          = t('debts.count', { count: enriched.length });
   document.getElementById('debts-overdue').textContent        = fmt(overdueAmount);
-  document.getElementById('debts-overdue-count').textContent  = `${overdueCount} arvet`;
+  document.getElementById('debts-overdue-count').textContent  = t('debts.count', { count: overdueCount });
 
   const filtered = debtsFilter === 'overdue'
     ? enriched.filter(d => d._isOverdue)
@@ -847,7 +1092,7 @@ function renderDebts() {
 
   const tbody = document.querySelector('#debts-table tbody');
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Laekumata arveid pole</td></tr>';
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">${t('debts.no_unpaid')}</td></tr>`;
     return;
   }
 
@@ -867,7 +1112,9 @@ function formatDate(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '—';
-  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+  return new Intl.DateTimeFormat(LOCALES[currentLang], {
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(d);
 }
 
 function escapeHtml(s) {
@@ -921,9 +1168,9 @@ function renderKPIs(kpis, prev) {
 
 function renderComparison(cur, prev, prevYear, prevLabel, prevYearLabel) {
   const rows = [
-    { label: 'Käive',      cur: cur.kaive,      p: prev?.kaive,      py: prevYear?.kaive },
-    { label: 'Ärikasum',   cur: cur.arikasum,   p: prev?.arikasum,   py: prevYear?.arikasum },
-    { label: 'Nettokasum', cur: cur.netKasum,   p: prev?.netKasum,   py: prevYear?.netKasum },
+    { label: t('kpi.revenue'),          cur: cur.kaive,      p: prev?.kaive,      py: prevYear?.kaive },
+    { label: t('kpi.operating_income'), cur: cur.arikasum,   p: prev?.arikasum,   py: prevYear?.arikasum },
+    { label: t('kpi.net_income'),       cur: cur.netKasum,   p: prev?.netKasum,   py: prevYear?.netKasum },
   ];
 
   const ths = document.querySelectorAll('#comparison-table thead th');
@@ -969,7 +1216,7 @@ async function renderTrendChart() {
       labels,
       datasets: [
         {
-          label: 'Käive',
+          label: t('kpi.revenue'),
           data: kaive,
           backgroundColor: 'rgba(16,185,129,0.25)',
           borderColor: '#10b981',
@@ -977,7 +1224,7 @@ async function renderTrendChart() {
           borderRadius: 4,
         },
         {
-          label: 'Nettokasum',
+          label: t('kpi.net_income'),
           data: netK,
           type: 'line',
           borderColor: '#6366f1',
