@@ -163,30 +163,31 @@
     }
     .btn-logout:hover { border-color: var(--neg); color: var(--neg); }
 
-    /* ── Language switcher (segment control) ── */
+    /* ── Language switcher (flag buttons) ── */
     .lang-switcher {
       display: inline-flex;
-      gap: 0;
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 2px;
+      gap: 6px;
     }
     .lang-btn {
-      padding: 5px 10px;
+      padding: 0;
       background: transparent;
-      border: none;
-      border-radius: 5px;
-      color: var(--text2);
-      font-family: inherit;
-      font-size: 11px;
-      font-weight: 600;
+      border: 2px solid transparent;
+      border-radius: 4px;
       cursor: pointer;
-      letter-spacing: 0.5px;
-      transition: background 0.2s, color 0.2s;
+      overflow: hidden;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 0.2s, transform 0.15s, opacity 0.2s;
+      opacity: 0.55;
+      line-height: 0;
     }
-    .lang-btn:hover:not(.active) { color: var(--text); }
-    .lang-btn.active { background: var(--accent); color: #fff; }
+    .lang-btn:hover { opacity: 1; transform: scale(1.08); }
+    .lang-btn.active { opacity: 1; border-color: var(--accent); }
+    .lang-btn svg { display: block; width: 28px; height: 20px; }
+    @media (max-width: 640px) {
+      .lang-btn svg { width: 26px; height: 18px; }
+    }
 
     main { padding: 28px 24px; max-width: 1200px; margin: 0 auto; width: 100%; }
 
@@ -369,10 +370,16 @@
     <img src="../Logo.png" alt="LessGo" class="auth-logo">
     <h1>Skoor</h1>
     <p class="auth-subtitle" data-i18n="auth.subtitle">Finantsiülevaade</p>
-    <div class="lang-switcher" style="margin-bottom:24px;">
-      <button type="button" class="lang-btn" data-lang="et">ET</button>
-      <button type="button" class="lang-btn" data-lang="en">EN</button>
-      <button type="button" class="lang-btn" data-lang="sv">SV</button>
+    <div class="lang-switcher" style="margin-bottom:24px; justify-content:center;">
+      <button type="button" class="lang-btn" data-lang="et" aria-label="EST" title="EST">
+        <svg viewBox="0 0 11 7" xmlns="http://www.w3.org/2000/svg"><rect width="11" height="7" fill="#fff"/><rect width="11" height="4.67" fill="#000"/><rect width="11" height="2.33" fill="#0072CE"/></svg>
+      </button>
+      <button type="button" class="lang-btn" data-lang="en" aria-label="ENG" title="ENG">
+        <svg viewBox="0 0 19 10" xmlns="http://www.w3.org/2000/svg"><rect width="19" height="10" fill="#B22234"/><rect y="0.77" width="19" height="0.77" fill="#fff"/><rect y="2.31" width="19" height="0.77" fill="#fff"/><rect y="3.85" width="19" height="0.77" fill="#fff"/><rect y="5.38" width="19" height="0.77" fill="#fff"/><rect y="6.92" width="19" height="0.77" fill="#fff"/><rect y="8.46" width="19" height="0.77" fill="#fff"/><rect width="7.6" height="5.38" fill="#3C3B6E"/></svg>
+      </button>
+      <button type="button" class="lang-btn" data-lang="sv" aria-label="SWE" title="SWE">
+        <svg viewBox="0 0 16 10" xmlns="http://www.w3.org/2000/svg"><rect width="16" height="10" fill="#006AA7"/><rect width="16" height="2" y="4" fill="#FECC00"/><rect width="2" height="10" x="5" fill="#FECC00"/></svg>
+      </button>
     </div>
     <form id="login-form">
       <input type="email"    id="email"    placeholder="E-posti aadress" data-i18n-placeholder="auth.email" autocomplete="email" required>
@@ -403,9 +410,15 @@
       <select id="period-select"></select>
       <button class="btn-refresh" id="refresh-btn" style="display:none" data-i18n="btn.refresh">⟳ Uuenda</button>
       <div class="lang-switcher">
-        <button type="button" class="lang-btn" data-lang="et">ET</button>
-        <button type="button" class="lang-btn" data-lang="en">EN</button>
-        <button type="button" class="lang-btn" data-lang="sv">SV</button>
+        <button type="button" class="lang-btn" data-lang="et" aria-label="EST" title="EST">
+          <svg viewBox="0 0 11 7" xmlns="http://www.w3.org/2000/svg"><rect width="11" height="7" fill="#fff"/><rect width="11" height="4.67" fill="#000"/><rect width="11" height="2.33" fill="#0072CE"/></svg>
+        </button>
+        <button type="button" class="lang-btn" data-lang="en" aria-label="ENG" title="ENG">
+          <svg viewBox="0 0 19 10" xmlns="http://www.w3.org/2000/svg"><rect width="19" height="10" fill="#B22234"/><rect y="0.77" width="19" height="0.77" fill="#fff"/><rect y="2.31" width="19" height="0.77" fill="#fff"/><rect y="3.85" width="19" height="0.77" fill="#fff"/><rect y="5.38" width="19" height="0.77" fill="#fff"/><rect y="6.92" width="19" height="0.77" fill="#fff"/><rect y="8.46" width="19" height="0.77" fill="#fff"/><rect width="7.6" height="5.38" fill="#3C3B6E"/></svg>
+        </button>
+        <button type="button" class="lang-btn" data-lang="sv" aria-label="SWE" title="SWE">
+          <svg viewBox="0 0 16 10" xmlns="http://www.w3.org/2000/svg"><rect width="16" height="10" fill="#006AA7"/><rect width="16" height="2" y="4" fill="#FECC00"/><rect width="2" height="10" x="5" fill="#FECC00"/></svg>
+        </button>
       </div>
       <button class="btn-logout" id="logout-btn" data-i18n="auth.signout">Logi välja</button>
     </div>
