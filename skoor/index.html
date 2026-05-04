@@ -150,6 +150,20 @@
     .btn-refresh.success { background: var(--pos); color: #fff; border-color: var(--pos); }
     .btn-refresh.error { background: var(--neg); color: #fff; border-color: var(--neg); }
 
+    .btn-admin {
+      padding: 8px 14px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text2);
+      font-family: inherit;
+      font-size: 13px;
+      text-decoration: none;
+      display: none;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .btn-admin:hover { border-color: var(--accent); color: var(--accent); opacity: 1; }
+
     .btn-logout {
       padding: 8px 16px;
       background: transparent;
@@ -326,7 +340,7 @@
     /* ── Print / PDF ── */
     @media print {
       body { background: #fff; color: #000; }
-      header, .btn-pdf, .btn-refresh, .btn-logout, .lang-switcher, #client-select, #period-select, .filter-bar { display: none !important; }
+      header, .btn-pdf, .btn-refresh, .btn-admin, .btn-logout, .lang-switcher, #client-select, #period-select, .filter-bar { display: none !important; }
       .card { background: #fff; border: 1px solid #ddd; break-inside: avoid; }
       .kpi-grid { grid-template-columns: repeat(5, 1fr); }
       .kpi-card { background: #f9f9f9; border: 1px solid #ddd; }
@@ -425,6 +439,7 @@
       <select id="client-select" style="display:none"></select>
       <select id="period-select"></select>
       <button class="btn-refresh" id="refresh-btn" style="display:none" data-i18n="btn.refresh">⟳ Uuenda</button>
+      <a id="admin-link" href="admin/timer.html" class="btn-admin">⚙ Admin</a>
       <div class="lang-switcher">
         <button type="button" class="lang-btn" data-lang="et" aria-label="EST" title="EST">
           <svg viewBox="0 0 11 7" xmlns="http://www.w3.org/2000/svg"><rect width="11" height="7" fill="#fff"/><rect width="11" height="4.67" fill="#000"/><rect width="11" height="2.33" fill="#0072CE"/></svg>
@@ -980,6 +995,7 @@ async function onLogin(user) {
 
   if (isAdmin) {
     document.getElementById('refresh-btn').style.display = 'block';
+    document.getElementById('admin-link').style.display = 'inline-block';
   }
 
   if (isAdmin && clients?.length > 1) {

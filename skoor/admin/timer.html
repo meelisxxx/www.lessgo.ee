@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skoor Admin — Tööaeg</title>
+  <link rel="icon" type="image/png" href="../../Logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #111827;
+      --bg2:      #1f2937;
+      --bg3:      #374151;
+      --border:   rgba(255,255,255,0.08);
+      --text:     #f9fafb;
+      --text2:    #9ca3af;
+      --text3:    #6b7280;
+      --accent:   #10b981;
+      --pos:      #10b981;
+      --neg:      #ef4444;
+      --warn:     #f59e0b;
+      --radius:   12px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { opacity: 0.8; }
+
+    /* ── Loading / access ── */
+    #loading-screen, #denied-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      text-align: center;
+    }
+    #denied-screen h2 { color: var(--neg); margin-bottom: 12px; }
+    #denied-screen p { color: var(--text2); margin-bottom: 24px; }
+
+    /* ── Header ── */
+    #app { display: none; flex-direction: column; min-height: 100vh; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-logo { width: 36px; height: 36px; border-radius: 50%; }
+    .header-title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
+    .header-title .badge {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-left: 8px;
+      vertical-align: middle;
+      letter-spacing: 1px;
+    }
+    .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    .nav-link {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text2);
+      font-size: 13px;
+    }
+    .nav-link:hover { color: var(--text); border-color: var(--text2); opacity: 1; }
+
+    /* ── Buttons ── */
+    button {
+      cursor: pointer;
+      font-family: inherit;
+      border: none;
+      border-radius: 8px;
+      transition: opacity 0.2s, background 0.2s, transform 0.1s;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 18px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+    .btn-secondary {
+      background: var(--bg3);
+      color: var(--text);
+      padding: 8px 14px;
+      font-size: 13px;
+    }
+    .btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+    .btn-danger {
+      background: var(--neg);
+      color: #fff;
+      padding: 10px 18px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .btn-danger:hover:not(:disabled) { opacity: 0.9; }
+    .btn-icon {
+      background: transparent;
+      color: var(--text2);
+      padding: 4px 8px;
+      font-size: 14px;
+    }
+    .btn-icon:hover { color: var(--text); }
+    .btn-icon.danger:hover { color: var(--neg); }
+
+    select, input[type="text"], input[type="email"], input[type="number"],
+    input[type="datetime-local"], input[type="month"], textarea {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color 0.2s;
+      width: 100%;
+    }
+    select:focus, input:focus, textarea:focus { border-color: var(--accent); }
+    label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* ── Running banner ── */
+    .running-banner {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: linear-gradient(90deg, rgba(16,185,129,0.18) 0%, rgba(16,185,129,0.08) 100%);
+      border-bottom: 1px solid rgba(16,185,129,0.4);
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .running-banner.visible { display: flex; }
+    .running-banner .pulse {
+      width: 12px;
+      height: 12px;
+      background: var(--neg);
+      border-radius: 50%;
+      animation: pulse 1.5s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.3); }
+    }
+    .running-info { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; }
+    .running-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .running-label { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.6px; }
+    .running-client { font-size: 16px; font-weight: 600; color: var(--text); }
+    .running-time {
+      font-size: 24px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--accent);
+    }
+
+    main { padding: 24px; max-width: 1200px; margin: 0 auto; width: 100%; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .card h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text2);
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    /* ── Timer controls ── */
+    .timer-controls { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+    .timer-controls .field { flex: 1; min-width: 220px; }
+    .timer-controls button { white-space: nowrap; }
+    .actions-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+
+    /* ── Period picker ── */
+    .period-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .period-bar label { margin: 0; }
+
+    /* ── Summary ── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .summary-tile {
+      background: var(--bg3);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .summary-tile .label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; }
+    .summary-tile .value { font-size: 18px; font-weight: 700; }
+    .summary-tile .sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+    .summary-totals {
+      display: flex;
+      gap: 24px;
+      padding: 14px;
+      background: rgba(16,185,129,0.08);
+      border: 1px solid rgba(16,185,129,0.3);
+      border-radius: 8px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+    .summary-totals > div { flex: 1; min-width: 150px; }
+    .summary-totals .label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.6px; }
+    .summary-totals .value { font-size: 20px; font-weight: 700; color: var(--accent); }
+
+    .summary-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+    .summary-table th { text-align: left; color: var(--text3); font-size: 11px; text-transform: uppercase; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    .summary-table th:not(:first-child) { text-align: right; }
+    .summary-table td { padding: 9px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); font-variant-numeric: tabular-nums; }
+    .summary-table td:not(:first-child) { text-align: right; }
+    .summary-table tr:last-child td { border-bottom: none; }
+    .summary-table .row-total td { font-weight: 700; color: var(--accent); padding-top: 12px; border-top: 1px solid rgba(16,185,129,0.4); }
+
+    /* ── Entries table ── */
+    .filters { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .filters select { width: auto; min-width: 160px; }
+    .entries-scroll { overflow-x: auto; }
+    .entries-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 720px; }
+    .entries-table th { text-align: left; color: var(--text3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; padding: 0 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .entries-table td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: top; }
+    .entries-table .col-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .entries-table .col-duration { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+    .entries-table .col-actions { white-space: nowrap; text-align: right; }
+    .entries-table .col-comment { color: var(--text2); }
+
+    .type-pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .type-pill.timer { background: rgba(16,185,129,0.15); color: var(--accent); }
+    .type-pill.manual { background: rgba(99,102,241,0.15); color: #818cf8; }
+    .type-pill.adjustment { background: rgba(245,158,11,0.15); color: var(--warn); }
+
+    .empty-msg { text-align: center; color: var(--text2); padding: 40px 0; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      width: 100%;
+      max-width: 480px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal h3 { font-size: 18px; font-weight: 600; margin-bottom: 20px; }
+    .modal .field { margin-bottom: 14px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    .modal-error { color: var(--neg); font-size: 13px; margin-top: 8px; }
+
+    /* ── Mobile ── */
+    @media (max-width: 640px) {
+      header { padding: 12px 16px; }
+      main { padding: 16px; }
+      .running-time { font-size: 20px; }
+      .running-client { font-size: 14px; }
+      .timer-controls { flex-direction: column; align-items: stretch; }
+      .timer-controls .field { min-width: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ LOADING ═══════════════════════════ -->
+<div id="loading-screen" style="display:flex">
+  <p style="color: var(--text2)">Laen...</p>
+</div>
+
+<!-- ═══════════════════════════ DENIED ════════════════════════════ -->
+<div id="denied-screen">
+  <h2>Ligipääs keelatud</h2>
+  <p>Sul pole admin õigusi.</p>
+  <a href="../" class="nav-link">← Skoor avalehele</a>
+</div>
+
+<!-- ═══════════════════════════ APP ═══════════════════════════════ -->
+<div id="app">
+  <header>
+    <a href="../" class="header-left" style="color:inherit">
+      <img src="../../Logo.png" alt="LessGo" class="header-logo">
+      <span class="header-title">Skoor<span class="badge">ADMIN</span></span>
+    </a>
+    <div class="header-right">
+      <a href="../" class="nav-link">← Klientide vaade</a>
+      <button class="btn-secondary" id="logout-btn">Logi välja</button>
+    </div>
+  </header>
+
+  <!-- Running timer banner -->
+  <div class="running-banner" id="running-banner">
+    <div class="running-info">
+      <div class="pulse"></div>
+      <div class="running-text">
+        <span class="running-label">TIMER JOOKSEB</span>
+        <span class="running-client" id="running-client">—</span>
+      </div>
+      <span class="running-time" id="running-time">0:00:00</span>
+    </div>
+    <button class="btn-danger" id="stop-timer-btn">⏹ Stop</button>
+  </div>
+
+  <main>
+
+    <!-- Timer card -->
+    <div class="card" id="timer-card">
+      <h2>Tööaja arvestus</h2>
+      <div class="timer-controls" id="timer-start-row">
+        <div class="field">
+          <label for="timer-client">Klient</label>
+          <select id="timer-client">
+            <option value="">— Vali klient —</option>
+          </select>
+        </div>
+        <button class="btn-primary" id="start-timer-btn">▶ Start</button>
+      </div>
+      <div class="actions-row">
+        <button class="btn-secondary" id="manual-entry-btn">+ Lisa käsitsi kanne</button>
+        <button class="btn-secondary" id="adjustment-btn">+ Lisa korrigeerimine</button>
+      </div>
+    </div>
+
+    <!-- Period selector -->
+    <div class="period-bar">
+      <label>Periood:</label>
+      <input type="month" id="period-input">
+      <button class="btn-secondary" id="prev-period-btn">‹ Eelmine</button>
+      <button class="btn-secondary" id="next-period-btn">Järgmine ›</button>
+      <button class="btn-secondary" id="this-period-btn">Käesolev kuu</button>
+    </div>
+
+    <!-- Monthly summary -->
+    <div class="card">
+      <h2 id="summary-title">Kuu kokkuvõte</h2>
+      <div class="entries-scroll">
+        <table class="summary-table" id="summary-table">
+          <thead>
+            <tr>
+              <th>Klient</th>
+              <th>Tracked</th>
+              <th>Adjustments</th>
+              <th>Kokku</th>
+              <th>Hind</th>
+              <th>EUR (käibemaksuta)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="summary-totals" id="summary-totals">
+        <div><div class="label">Kokku tunnid</div><div class="value" id="total-hours">—</div></div>
+        <div><div class="label">Kokku EUR (km-ta)</div><div class="value" id="total-eur">—</div></div>
+        <div><div class="label">+ KM 24%</div><div class="value" id="total-vat">—</div></div>
+        <div><div class="label">Kokku EUR (km-ga)</div><div class="value" id="total-eur-vat">—</div></div>
+      </div>
+    </div>
+
+    <!-- Entries -->
+    <div class="card">
+      <h2>Sissekanded</h2>
+      <div class="filters">
+        <select id="filter-admin"><option value="">Kõik adminid</option></select>
+        <select id="filter-client"><option value="">Kõik kliendid</option></select>
+        <select id="filter-type">
+          <option value="">Kõik tüübid</option>
+          <option value="timer">Timer</option>
+          <option value="manual">Manual</option>
+          <option value="adjustment">Adjustment</option>
+        </select>
+      </div>
+      <div class="entries-scroll">
+        <table class="entries-table" id="entries-table">
+          <thead>
+            <tr>
+              <th>Aeg</th>
+              <th>Admin</th>
+              <th>Klient</th>
+              <th>Tüüp</th>
+              <th>Kestus</th>
+              <th>Kommentaar</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══════════════════════════ MODALS ═══════════════════════════ -->
+
+<!-- Stop timer modal (optional comment) -->
+<div class="modal-overlay" id="stop-modal">
+  <div class="modal">
+    <h3>Peata timer</h3>
+    <div class="field">
+      <label for="stop-comment">Kommentaar (valikuline)</label>
+      <textarea id="stop-comment" rows="3" placeholder="Mida tegid?"></textarea>
+    </div>
+    <p class="modal-error" id="stop-modal-error"></p>
+    <div class="modal-actions">
+      <button class="btn-secondary" data-dismiss="stop-modal">Tühista</button>
+      <button class="btn-primary" id="stop-confirm-btn">Peata ja salvesta</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manual entry modal -->
+<div class="modal-overlay" id="manual-modal">
+  <div class="modal">
+    <h3 id="manual-modal-title">Lisa käsitsi kanne</h3>
+    <div class="field">
+      <label for="manual-client">Klient *</label>
+      <select id="manual-client"><option value="">— Vali —</option></select>
+    </div>
+    <div class="field">
+      <label for="manual-start">Algus *</label>
+      <input type="datetime-local" id="manual-start">
+    </div>
+    <div class="field">
+      <label for="manual-end">Lõpp *</label>
+      <input type="datetime-local" id="manual-end">
+    </div>
+    <div class="field">
+      <label for="manual-comment">Kommentaar</label>
+      <textarea id="manual-comment" rows="3"></textarea>
+    </div>
+    <p class="modal-error" id="manual-modal-error"></p>
+    <div class="modal-actions">
+      <button class="btn-secondary" data-dismiss="manual-modal">Tühista</button>
+      <button class="btn-primary" id="manual-save-btn">Salvesta</button>
+    </div>
+  </div>
+</div>
+
+<!-- Adjustment modal -->
+<div class="modal-overlay" id="adjustment-modal">
+  <div class="modal">
+    <h3 id="adjustment-modal-title">Lisa korrigeerimine</h3>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:14px">Korrigeerimine on kuu lõpu lisaaeg millel pole konkreetset algust/lõppu (nt e-mailid, kõned).</p>
+    <div class="field">
+      <label for="adj-client">Klient *</label>
+      <select id="adj-client"><option value="">— Vali —</option></select>
+    </div>
+    <div class="field">
+      <label for="adj-period">Periood *</label>
+      <input type="month" id="adj-period">
+    </div>
+    <div class="field">
+      <label for="adj-duration">Kestus (h:m) *</label>
+      <input type="text" id="adj-duration" placeholder="nt 1:30 või 0:45">
+    </div>
+    <div class="field">
+      <label for="adj-comment">Kommentaar</label>
+      <textarea id="adj-comment" rows="3"></textarea>
+    </div>
+    <p class="modal-error" id="adj-modal-error"></p>
+    <div class="modal-actions">
+      <button class="btn-secondary" data-dismiss="adjustment-modal">Tühista</button>
+      <button class="btn-primary" id="adj-save-btn">Salvesta</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit entry modal -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <h3>Muuda kannet</h3>
+    <input type="hidden" id="edit-id">
+    <input type="hidden" id="edit-type">
+    <div class="field">
+      <label>Tüüp</label>
+      <input type="text" id="edit-type-display" disabled>
+    </div>
+    <div class="field">
+      <label for="edit-client">Klient</label>
+      <select id="edit-client"></select>
+    </div>
+    <div class="field" id="edit-times-row">
+      <label for="edit-start">Algus</label>
+      <input type="datetime-local" id="edit-start">
+    </div>
+    <div class="field">
+      <label for="edit-end">Lõpp</label>
+      <input type="datetime-local" id="edit-end">
+    </div>
+    <div class="field" id="edit-duration-row" style="display:none">
+      <label for="edit-duration">Kestus (h:m)</label>
+      <input type="text" id="edit-duration" placeholder="nt 1:30">
+    </div>
+    <div class="field">
+      <label for="edit-period">Periood</label>
+      <input type="month" id="edit-period">
+    </div>
+    <div class="field">
+      <label for="edit-comment">Kommentaar</label>
+      <textarea id="edit-comment" rows="3"></textarea>
+    </div>
+    <p class="modal-error" id="edit-modal-error"></p>
+    <div class="modal-actions">
+      <button class="btn-danger" id="edit-delete-btn" style="margin-right:auto">🗑 Kustuta</button>
+      <button class="btn-secondary" data-dismiss="edit-modal">Tühista</button>
+      <button class="btn-primary" id="edit-save-btn">Salvesta</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL  = 'https://lpehwgpitfowhyiaxrhe.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWh3Z3BpdGZvd2h5aWF4cmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzE3NDIsImV4cCI6MjA5MjYwNzc0Mn0.VRAFWMrlyigtPlDVAk9KG2NiFLd1l5aRxwmNrariUfI';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ── Globals ─────────────────────────────────────────────────────
+let currentUser = null;
+let isAdmin = false;
+let clients = [];           // [{id, name}]
+let admins = [];            // [{user_id, email}]
+let activeTimer = null;     // running timer (this admin)
+let timerTickInterval = null;
+let entries = [];           // entries for currentPeriod
+let rates = {};             // client_id -> {rate_eur, is_fixed_price, fixed_price_eur}
+let currentPeriod = todayPeriod();
+
+// ── Helpers ─────────────────────────────────────────────────────
+function todayPeriod() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function shiftPeriod(period, delta) {
+  const [y, m] = period.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function formatDuration(ms) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function formatHM(minutes) {
+  if (minutes == null) return '—';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h}h ${String(m).padStart(2,'0')}m`;
+}
+
+function parseHM(str) {
+  // "1:30" → 90, "0:45" → 45, "2" → 120
+  const trimmed = (str || '').trim();
+  if (/^\d+$/.test(trimmed)) return parseInt(trimmed) * 60;
+  const m = trimmed.match(/^(\d+):(\d+)$/);
+  if (!m) return null;
+  return parseInt(m[1]) * 60 + parseInt(m[2]);
+}
+
+function fmtEur(v) {
+  if (v == null) return '—';
+  return new Intl.NumberFormat('et-EE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v) + ' €';
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return new Intl.DateTimeFormat('et-EE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
+}
+
+function isoToLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const tzOffset = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+}
+
+function localInputToIso(local) {
+  if (!local) return null;
+  return new Date(local).toISOString();
+}
+
+function adminName(userId) {
+  const a = admins.find(x => x.user_id === userId);
+  return a?.email?.split('@')[0] || userId.slice(0, 8);
+}
+
+function clientName(id) {
+  const c = clients.find(x => x.id === id);
+  return c?.name || '?';
+}
+
+function showError(elementId, msg) {
+  const el = document.getElementById(elementId);
+  el.textContent = msg || '';
+}
+
+// ── Init ────────────────────────────────────────────────────────
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    // Not logged in — redirect to client view (handles login)
+    window.location.href = '../';
+    return;
+  }
+  currentUser = session.user;
+
+  const { data: adminRow } = await sb.from('admins').select('user_id').eq('user_id', currentUser.id).maybeSingle();
+  isAdmin = !!adminRow;
+
+  if (!isAdmin) {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('denied-screen').style.display = 'flex';
+    return;
+  }
+
+  await loadAdmins();
+  await loadClients();
+  await loadRates();
+  await loadActiveTimer();
+  await loadEntries();
+  populateClientDropdowns();
+  populateAdminDropdown();
+
+  document.getElementById('period-input').value = currentPeriod;
+
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  startTimerLoop();
+  bindUIEvents();
+
+  sb.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT') window.location.href = '../';
+  });
+}
+
+async function loadAdmins() {
+  // Admins tabel ei pruugi sisaldada emaile — kasutame current user email'i ainult
+  // Edaspidi võiks lisada nimed admins tabeli.
+  const { data } = await sb.from('admins').select('user_id');
+  admins = (data || []).map(a => ({
+    user_id: a.user_id,
+    email: a.user_id === currentUser.id ? currentUser.email : a.user_id.slice(0, 8)
+  }));
+}
+
+async function loadClients() {
+  const { data, error } = await sb.from('clients').select('id, name').order('name');
+  if (error) { console.error('clients load:', error); return; }
+  clients = data || [];
+}
+
+async function loadRates() {
+  const { data, error } = await sb.from('hourly_rates').select('*');
+  if (error) { console.error('rates load:', error); return; }
+  rates = {};
+  (data || []).forEach(r => { rates[r.client_id] = r; });
+}
+
+async function loadActiveTimer() {
+  const { data } = await sb.from('time_entries')
+    .select('*')
+    .eq('admin_id', currentUser.id)
+    .eq('entry_type', 'timer')
+    .is('ended_at', null)
+    .maybeSingle();
+  activeTimer = data;
+}
+
+async function loadEntries() {
+  const { data, error } = await sb.from('time_entries')
+    .select('*')
+    .eq('period', currentPeriod)
+    .order('started_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
+  if (error) { console.error('entries load:', error); return; }
+  entries = data || [];
+  renderEntries();
+  renderSummary();
+}
+
+// ── Populate dropdowns ──────────────────────────────────────────
+function populateClientDropdowns() {
+  const opts = clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  ['timer-client', 'manual-client', 'adj-client', 'edit-client', 'filter-client'].forEach(id => {
+    const sel = document.getElementById(id);
+    const placeholder = (id === 'filter-client') ? '<option value="">Kõik kliendid</option>' :
+                        (id === 'edit-client') ? '' : '<option value="">— Vali —</option>';
+    sel.innerHTML = placeholder + opts;
+  });
+}
+
+function populateAdminDropdown() {
+  const sel = document.getElementById('filter-admin');
+  sel.innerHTML = '<option value="">Kõik adminid</option>' +
+    admins.map(a => `<option value="${a.user_id}">${escapeHtml(a.email.split('@')[0])}</option>`).join('');
+}
+
+// ── Timer loop ──────────────────────────────────────────────────
+function startTimerLoop() {
+  if (timerTickInterval) clearInterval(timerTickInterval);
+  timerTickInterval = setInterval(updateTimerDisplay, 1000);
+  updateTimerDisplay();
+}
+
+function updateTimerDisplay() {
+  const banner = document.getElementById('running-banner');
+  const startRow = document.getElementById('timer-start-row');
+
+  if (!activeTimer) {
+    banner.classList.remove('visible');
+    document.title = 'Skoor Admin — Tööaeg';
+    startRow.style.display = 'flex';
+    return;
+  }
+
+  const elapsed = Date.now() - new Date(activeTimer.started_at).getTime();
+  const formatted = formatDuration(elapsed);
+  const cName = clientName(activeTimer.client_id);
+
+  banner.classList.add('visible');
+  document.getElementById('running-time').textContent = formatted;
+  document.getElementById('running-client').textContent = cName;
+  document.title = `(${formatted}) ${cName} — Skoor`;
+  startRow.style.display = 'none';
+}
+
+// ── Timer actions ───────────────────────────────────────────────
+async function startTimer() {
+  const clientId = document.getElementById('timer-client').value;
+  if (!clientId) { alert('Vali kõigepealt klient.'); return; }
+  if (activeTimer) { alert('Sul juba jookseb timer.'); return; }
+
+  const { data, error } = await sb.from('time_entries').insert({
+    admin_id: currentUser.id,
+    client_id: clientId,
+    entry_type: 'timer',
+    started_at: new Date().toISOString(),
+    duration_minutes: 0,
+    period: currentPeriod,
+    created_by: currentUser.id
+  }).select().single();
+
+  if (error) {
+    if (error.code === '23505') {
+      // Race condition: another tab started timer
+      await loadActiveTimer();
+      updateTimerDisplay();
+      alert('Sul juba jookseb timer (võib-olla teises tabis).');
+    } else {
+      alert('Viga timer käivitamisel: ' + error.message);
+    }
+    return;
+  }
+  activeTimer = data;
+  updateTimerDisplay();
+  await loadEntries();
+}
+
+function openStopModal() {
+  if (!activeTimer) return;
+  document.getElementById('stop-comment').value = '';
+  showError('stop-modal-error', '');
+  showModal('stop-modal');
+}
+
+async function stopTimerConfirm() {
+  if (!activeTimer) return;
+  const comment = document.getElementById('stop-comment').value.trim() || null;
+  const btn = document.getElementById('stop-confirm-btn');
+  btn.disabled = true;
+
+  const { error } = await sb.from('time_entries').update({
+    ended_at: new Date().toISOString(),
+    comment: comment,
+    edited_at: new Date().toISOString(),
+    edited_by: currentUser.id
+  }).eq('id', activeTimer.id);
+
+  btn.disabled = false;
+
+  if (error) {
+    showError('stop-modal-error', 'Viga: ' + error.message);
+    return;
+  }
+  activeTimer = null;
+  hideModal('stop-modal');
+  updateTimerDisplay();
+  await loadEntries();
+}
+
+// ── Manual entry ────────────────────────────────────────────────
+function openManualModal() {
+  document.getElementById('manual-client').value = '';
+  document.getElementById('manual-start').value = '';
+  document.getElementById('manual-end').value = '';
+  document.getElementById('manual-comment').value = '';
+  showError('manual-modal-error', '');
+  showModal('manual-modal');
+}
+
+async function saveManual() {
+  const clientId = document.getElementById('manual-client').value;
+  const startLocal = document.getElementById('manual-start').value;
+  const endLocal = document.getElementById('manual-end').value;
+  const comment = document.getElementById('manual-comment').value.trim() || null;
+
+  if (!clientId) return showError('manual-modal-error', 'Vali klient.');
+  if (!startLocal) return showError('manual-modal-error', 'Sisesta algus.');
+  if (!endLocal) return showError('manual-modal-error', 'Sisesta lõpp.');
+
+  const startIso = localInputToIso(startLocal);
+  const endIso = localInputToIso(endLocal);
+  if (new Date(endIso) <= new Date(startIso)) {
+    return showError('manual-modal-error', 'Lõpp peab olema algusest hiljem.');
+  }
+
+  const period = startIso.slice(0, 7);  // yyyy-mm
+  const btn = document.getElementById('manual-save-btn');
+  btn.disabled = true;
+
+  const { error } = await sb.from('time_entries').insert({
+    admin_id: currentUser.id,
+    client_id: clientId,
+    entry_type: 'manual',
+    started_at: startIso,
+    ended_at: endIso,
+    duration_minutes: 0,  // trigger arvutab
+    period: period,
+    comment: comment,
+    created_by: currentUser.id
+  });
+
+  btn.disabled = false;
+  if (error) return showError('manual-modal-error', 'Viga: ' + error.message);
+
+  hideModal('manual-modal');
+  await loadEntries();
+}
+
+// ── Adjustment ──────────────────────────────────────────────────
+function openAdjustmentModal() {
+  document.getElementById('adj-client').value = '';
+  document.getElementById('adj-period').value = currentPeriod;
+  document.getElementById('adj-duration').value = '';
+  document.getElementById('adj-comment').value = '';
+  showError('adj-modal-error', '');
+  showModal('adjustment-modal');
+}
+
+async function saveAdjustment() {
+  const clientId = document.getElementById('adj-client').value;
+  const period = document.getElementById('adj-period').value;
+  const durationStr = document.getElementById('adj-duration').value;
+  const comment = document.getElementById('adj-comment').value.trim() || null;
+
+  if (!clientId) return showError('adj-modal-error', 'Vali klient.');
+  if (!period) return showError('adj-modal-error', 'Sisesta periood.');
+  const minutes = parseHM(durationStr);
+  if (minutes == null || minutes <= 0) return showError('adj-modal-error', 'Vigane kestus. Formaat: 1:30 või 0:45.');
+
+  const btn = document.getElementById('adj-save-btn');
+  btn.disabled = true;
+
+  const { error } = await sb.from('time_entries').insert({
+    admin_id: currentUser.id,
+    client_id: clientId,
+    entry_type: 'adjustment',
+    started_at: null,
+    ended_at: null,
+    duration_minutes: minutes,
+    period: period,
+    comment: comment,
+    created_by: currentUser.id
+  });
+
+  btn.disabled = false;
+  if (error) return showError('adj-modal-error', 'Viga: ' + error.message);
+
+  hideModal('adjustment-modal');
+  await loadEntries();
+}
+
+// ── Edit entry ──────────────────────────────────────────────────
+function openEditModal(entryId) {
+  const e = entries.find(x => x.id === entryId);
+  if (!e) return;
+
+  document.getElementById('edit-id').value = e.id;
+  document.getElementById('edit-type').value = e.entry_type;
+  document.getElementById('edit-type-display').value =
+    e.entry_type === 'timer' ? 'Timer' :
+    e.entry_type === 'manual' ? 'Manual' : 'Korrigeerimine';
+  document.getElementById('edit-client').value = e.client_id;
+  document.getElementById('edit-period').value = e.period;
+  document.getElementById('edit-comment').value = e.comment || '';
+
+  if (e.entry_type === 'adjustment') {
+    document.getElementById('edit-times-row').style.display = 'none';
+    document.querySelector('label[for=edit-end]').parentElement.style.display = 'none';
+    document.getElementById('edit-duration-row').style.display = 'block';
+    document.getElementById('edit-duration').value = formatHM(e.duration_minutes);
+  } else {
+    document.getElementById('edit-times-row').style.display = 'block';
+    document.querySelector('label[for=edit-end]').parentElement.style.display = 'block';
+    document.getElementById('edit-duration-row').style.display = 'none';
+    document.getElementById('edit-start').value = isoToLocalInput(e.started_at);
+    document.getElementById('edit-end').value = isoToLocalInput(e.ended_at);
+  }
+
+  showError('edit-modal-error', '');
+  showModal('edit-modal');
+}
+
+async function saveEdit() {
+  const id = document.getElementById('edit-id').value;
+  const type = document.getElementById('edit-type').value;
+  const clientId = document.getElementById('edit-client').value;
+  const period = document.getElementById('edit-period').value;
+  const comment = document.getElementById('edit-comment').value.trim() || null;
+
+  if (!clientId) return showError('edit-modal-error', 'Vali klient.');
+  if (!period) return showError('edit-modal-error', 'Sisesta periood.');
+
+  const update = {
+    client_id: clientId,
+    period: period,
+    comment: comment,
+    edited_at: new Date().toISOString(),
+    edited_by: currentUser.id
+  };
+
+  if (type === 'adjustment') {
+    const dur = parseHM(document.getElementById('edit-duration').value);
+    if (dur == null || dur <= 0) return showError('edit-modal-error', 'Vigane kestus.');
+    update.duration_minutes = dur;
+  } else {
+    const startLocal = document.getElementById('edit-start').value;
+    const endLocal = document.getElementById('edit-end').value;
+    if (!startLocal || !endLocal) return showError('edit-modal-error', 'Sisesta algus ja lõpp.');
+    update.started_at = localInputToIso(startLocal);
+    update.ended_at = localInputToIso(endLocal);
+    if (new Date(update.ended_at) <= new Date(update.started_at)) {
+      return showError('edit-modal-error', 'Lõpp peab olema algusest hiljem.');
+    }
+    update.duration_minutes = 0; // trigger arvutab
+  }
+
+  const btn = document.getElementById('edit-save-btn');
+  btn.disabled = true;
+
+  const { error } = await sb.from('time_entries').update(update).eq('id', id);
+
+  btn.disabled = false;
+  if (error) return showError('edit-modal-error', 'Viga: ' + error.message);
+
+  hideModal('edit-modal');
+  // Kui muutsime parasjagu jooksvat timer'it, uuenda activeTimer
+  if (activeTimer && activeTimer.id === id) await loadActiveTimer();
+  await loadEntries();
+  updateTimerDisplay();
+}
+
+async function deleteEntry() {
+  const id = document.getElementById('edit-id').value;
+  if (!confirm('Kustuta see kanne lõplikult?')) return;
+  const { error } = await sb.from('time_entries').delete().eq('id', id);
+  if (error) return showError('edit-modal-error', 'Viga: ' + error.message);
+
+  if (activeTimer && activeTimer.id === id) {
+    activeTimer = null;
+    updateTimerDisplay();
+  }
+  hideModal('edit-modal');
+  await loadEntries();
+}
+
+// ── Render entries ──────────────────────────────────────────────
+function renderEntries() {
+  const fAdmin = document.getElementById('filter-admin').value;
+  const fClient = document.getElementById('filter-client').value;
+  const fType = document.getElementById('filter-type').value;
+
+  let filtered = entries;
+  if (fAdmin) filtered = filtered.filter(e => e.admin_id === fAdmin);
+  if (fClient) filtered = filtered.filter(e => e.client_id === fClient);
+  if (fType) filtered = filtered.filter(e => e.entry_type === fType);
+
+  const tbody = document.querySelector('#entries-table tbody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">Sissekandeid ei ole</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(e => {
+    const timeCell = e.entry_type === 'adjustment'
+      ? `${escapeHtml(e.period)}<br><small style="color:var(--text3)">korrigeerimine</small>`
+      : (e.started_at
+          ? fmtDateTime(e.started_at) + (e.ended_at ? `<br><small style="color:var(--text3)">→ ${fmtDateTime(e.ended_at).split(', ')[1] || ''}</small>` : '<br><small style="color:var(--accent)">JOOKSEB</small>')
+          : '—');
+
+    const isRunning = e.entry_type === 'timer' && !e.ended_at;
+    const durationCell = isRunning ? '...' : formatHM(e.duration_minutes);
+
+    return `
+      <tr>
+        <td class="col-time">${timeCell}</td>
+        <td>${escapeHtml(adminName(e.admin_id))}</td>
+        <td>${escapeHtml(clientName(e.client_id))}</td>
+        <td><span class="type-pill ${e.entry_type}">${e.entry_type}</span></td>
+        <td class="col-duration">${durationCell}</td>
+        <td class="col-comment">${escapeHtml(e.comment || '—')}</td>
+        <td class="col-actions">
+          <button class="btn-icon" data-edit="${e.id}" title="Muuda">✏</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  // Bind edit clicks
+  tbody.querySelectorAll('[data-edit]').forEach(btn => {
+    btn.addEventListener('click', () => openEditModal(btn.dataset.edit));
+  });
+}
+
+// ── Render summary ──────────────────────────────────────────────
+function renderSummary() {
+  document.getElementById('summary-title').textContent = `Kuu kokkuvõte (${currentPeriod})`;
+
+  // Group by client
+  const byClient = {};
+  entries.forEach(e => {
+    if (!byClient[e.client_id]) byClient[e.client_id] = { tracked: 0, adjustments: 0 };
+    const isRunning = e.entry_type === 'timer' && !e.ended_at;
+    if (isRunning) return;  // ignore running timer in summary
+    if (e.entry_type === 'adjustment') {
+      byClient[e.client_id].adjustments += e.duration_minutes;
+    } else {
+      byClient[e.client_id].tracked += e.duration_minutes;
+    }
+  });
+
+  const tbody = document.querySelector('#summary-table tbody');
+  const sortedClients = Object.keys(byClient)
+    .map(cid => ({ cid, ...byClient[cid] }))
+    .filter(x => x.tracked + x.adjustments > 0)
+    .sort((a, b) => clientName(a.cid).localeCompare(clientName(b.cid)));
+
+  if (sortedClients.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">Selles kuus pole kandeid</td></tr>';
+    document.getElementById('total-hours').textContent = '0h 00m';
+    document.getElementById('total-eur').textContent = fmtEur(0);
+    document.getElementById('total-vat').textContent = fmtEur(0);
+    document.getElementById('total-eur-vat').textContent = fmtEur(0);
+    return;
+  }
+
+  let totalMinutes = 0;
+  let totalEur = 0;
+
+  tbody.innerHTML = sortedClients.map(({ cid, tracked, adjustments }) => {
+    const totalMin = tracked + adjustments;
+    const rate = rates[cid];
+    let priceLabel, eurAmount;
+    if (rate?.is_fixed_price) {
+      priceLabel = `fix: ${fmtEur(rate.fixed_price_eur)}`;
+      eurAmount = rate.fixed_price_eur;
+    } else if (rate?.rate_eur != null) {
+      priceLabel = `${fmtEur(rate.rate_eur)}/h`;
+      eurAmount = (totalMin / 60) * rate.rate_eur;
+    } else {
+      priceLabel = '<span style="color:var(--warn)">hind puudub</span>';
+      eurAmount = 0;
+    }
+    totalMinutes += totalMin;
+    totalEur += eurAmount;
+
+    return `
+      <tr>
+        <td>${escapeHtml(clientName(cid))}</td>
+        <td>${formatHM(tracked)}</td>
+        <td>${formatHM(adjustments)}</td>
+        <td>${formatHM(totalMin)}</td>
+        <td>${priceLabel}</td>
+        <td>${fmtEur(eurAmount)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  document.getElementById('total-hours').textContent = formatHM(totalMinutes);
+  document.getElementById('total-eur').textContent = fmtEur(totalEur);
+  const vat = totalEur * 0.24;
+  document.getElementById('total-vat').textContent = fmtEur(vat);
+  document.getElementById('total-eur-vat').textContent = fmtEur(totalEur + vat);
+}
+
+// ── Modals ──────────────────────────────────────────────────────
+function showModal(id) {
+  document.getElementById(id).classList.add('visible');
+}
+function hideModal(id) {
+  document.getElementById(id).classList.remove('visible');
+}
+
+// ── Utility ─────────────────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ── UI events ───────────────────────────────────────────────────
+function bindUIEvents() {
+  document.getElementById('logout-btn').addEventListener('click', () => sb.auth.signOut());
+
+  document.getElementById('start-timer-btn').addEventListener('click', startTimer);
+  document.getElementById('stop-timer-btn').addEventListener('click', openStopModal);
+  document.getElementById('stop-confirm-btn').addEventListener('click', stopTimerConfirm);
+
+  document.getElementById('manual-entry-btn').addEventListener('click', openManualModal);
+  document.getElementById('manual-save-btn').addEventListener('click', saveManual);
+
+  document.getElementById('adjustment-btn').addEventListener('click', openAdjustmentModal);
+  document.getElementById('adj-save-btn').addEventListener('click', saveAdjustment);
+
+  document.getElementById('edit-save-btn').addEventListener('click', saveEdit);
+  document.getElementById('edit-delete-btn').addEventListener('click', deleteEntry);
+
+  // Modal close on overlay click and Tühista button
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.classList.remove('visible');
+    });
+  });
+  document.querySelectorAll('[data-dismiss]').forEach(btn => {
+    btn.addEventListener('click', () => hideModal(btn.dataset.dismiss));
+  });
+
+  // Period navigation
+  document.getElementById('period-input').addEventListener('change', async (e) => {
+    currentPeriod = e.target.value;
+    await loadEntries();
+  });
+  document.getElementById('prev-period-btn').addEventListener('click', async () => {
+    currentPeriod = shiftPeriod(currentPeriod, -1);
+    document.getElementById('period-input').value = currentPeriod;
+    await loadEntries();
+  });
+  document.getElementById('next-period-btn').addEventListener('click', async () => {
+    currentPeriod = shiftPeriod(currentPeriod, +1);
+    document.getElementById('period-input').value = currentPeriod;
+    await loadEntries();
+  });
+  document.getElementById('this-period-btn').addEventListener('click', async () => {
+    currentPeriod = todayPeriod();
+    document.getElementById('period-input').value = currentPeriod;
+    await loadEntries();
+  });
+
+  // Filters
+  ['filter-admin', 'filter-client', 'filter-type'].forEach(id => {
+    document.getElementById(id).addEventListener('change', renderEntries);
+  });
+}
+
+// ── Start ───────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
