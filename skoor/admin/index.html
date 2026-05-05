@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skoor Admin — Status</title>
+  <link rel="icon" type="image/png" href="../../Logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #111827;
+      --bg2:      #1f2937;
+      --bg3:      #374151;
+      --border:   rgba(255,255,255,0.08);
+      --text:     #f9fafb;
+      --text2:    #9ca3af;
+      --text3:    #6b7280;
+      --accent:   #10b981;
+      --pos:      #10b981;
+      --neg:      #ef4444;
+      --warn:     #f59e0b;
+      --info:     #818cf8;
+      --gray:     #9ca3af;
+      --radius:   12px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { opacity: 0.8; }
+
+    #loading-screen, #denied-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      text-align: center;
+    }
+    #denied-screen h2 { color: var(--neg); margin-bottom: 12px; }
+    #denied-screen p { color: var(--text2); margin-bottom: 24px; }
+
+    #app { display: none; flex-direction: column; min-height: 100vh; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-logo { width: 36px; height: 36px; border-radius: 50%; }
+    .header-title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
+    .header-title .badge {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-left: 8px;
+      vertical-align: middle;
+      letter-spacing: 1px;
+    }
+    .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    .nav-link {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text2);
+      font-size: 13px;
+    }
+    .nav-link:hover { color: var(--text); border-color: var(--text2); opacity: 1; }
+    .nav-link.active { color: var(--text); border-color: var(--accent); background: rgba(16,185,129,0.08); }
+
+    button {
+      cursor: pointer;
+      font-family: inherit;
+      border: none;
+      border-radius: 8px;
+      transition: opacity 0.2s, background 0.2s;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary {
+      background: var(--bg3);
+      color: var(--text);
+      padding: 8px 14px;
+      font-size: 13px;
+    }
+    .btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+
+    input[type="month"] {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      padding: 9px 12px;
+      outline: none;
+    }
+    input[type="month"]:focus { border-color: var(--accent); }
+
+    main { padding: 24px; max-width: 1200px; margin: 0 auto; width: 100%; }
+
+    /* Banner */
+    .red-banner {
+      display: none;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      background: linear-gradient(90deg, rgba(239,68,68,0.20) 0%, rgba(239,68,68,0.08) 100%);
+      border: 1px solid rgba(239,68,68,0.4);
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+    }
+    .red-banner.visible { display: flex; }
+    .red-banner .icon { font-size: 22px; }
+    .red-banner .text { flex: 1; font-size: 14px; }
+    .red-banner .text strong { color: var(--neg); }
+
+    /* Period bar */
+    .period-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .period-bar label { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .stat-tile {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .stat-tile .dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .stat-tile .dot.green   { background: var(--pos); }
+    .stat-tile .dot.yellow  { background: var(--warn); }
+    .stat-tile .dot.red     { background: var(--neg); }
+    .stat-tile .dot.gray    { background: var(--gray); }
+    .stat-tile .label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-tile .value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    /* Cards grid */
+    .clients-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 16px;
+    }
+
+    .client-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.1s;
+      position: relative;
+      overflow: hidden;
+    }
+    .client-card:hover { border-color: var(--text2); }
+    .client-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; bottom: 0;
+      width: 4px;
+    }
+    .client-card.status-green::before  { background: var(--pos); }
+    .client-card.status-yellow::before { background: var(--warn); }
+    .client-card.status-red::before    { background: var(--neg); }
+    .client-card.status-gray::before   { background: var(--gray); }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .client-name { font-size: 16px; font-weight: 600; }
+    .status-icon { font-size: 18px; flex-shrink: 0; }
+
+    .progress-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .progress-bar {
+      flex: 1;
+      height: 6px;
+      background: var(--bg3);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--pos);
+      transition: width 0.3s;
+    }
+    .progress-text {
+      font-size: 12px;
+      color: var(--text2);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .task-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .task-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      font-size: 13px;
+    }
+    .task-item .task-icon { width: 14px; flex-shrink: 0; }
+    .task-item .task-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .task-item .task-due { font-size: 11px; color: var(--text3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .task-item.overdue .task-due { color: var(--neg); font-weight: 600; }
+    .task-item.near    .task-due { color: var(--warn); font-weight: 600; }
+    .task-item.done    .task-name { color: var(--text3); text-decoration: line-through; }
+
+    .all-done {
+      text-align: center;
+      padding: 16px 0;
+      color: var(--pos);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .empty-msg { text-align: center; color: var(--text2); padding: 40px 0; }
+
+    @media (max-width: 640px) {
+      header { padding: 12px 16px; }
+      main { padding: 16px; }
+      .clients-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading-screen" style="display:flex">
+  <p style="color: var(--text2)">Laen...</p>
+</div>
+
+<div id="denied-screen">
+  <h2>Ligipääs keelatud</h2>
+  <p>Sul pole admin õigusi.</p>
+  <a href="../" class="nav-link">← Skoor avalehele</a>
+</div>
+
+<div id="app">
+  <header>
+    <a href="../" class="header-left" style="color:inherit">
+      <img src="../../Logo.png" alt="LessGo" class="header-logo">
+      <span class="header-title">Skoor<span class="badge">ADMIN</span></span>
+    </a>
+    <div class="header-right">
+      <a href="index.html" class="nav-link active">Status</a>
+      <a href="timer.html" class="nav-link">Tööaeg</a>
+      <a href="tasks.html" class="nav-link">Ülesanded</a>
+      <a href="clients.html" class="nav-link">Kliendid</a>
+      <a href="templates.html" class="nav-link">Mallid</a>
+      <a href="../" class="nav-link">← Klientide vaade</a>
+      <button class="btn-secondary" id="logout-btn">Logi välja</button>
+    </div>
+  </header>
+
+  <main>
+
+    <div class="red-banner" id="red-banner">
+      <div class="icon">🚨</div>
+      <div class="text"><strong id="red-count">—</strong> <span id="red-text">klient vajab tähelepanu.</span></div>
+    </div>
+
+    <div class="period-bar">
+      <label>Periood:</label>
+      <input type="month" id="period-input">
+      <button class="btn-secondary" id="prev-period-btn">‹ Eelmine</button>
+      <button class="btn-secondary" id="next-period-btn">Järgmine ›</button>
+      <button class="btn-secondary" id="this-period-btn">Käesolev kuu</button>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-tile"><div class="dot green"></div><div><div class="label">Roheline</div><div class="value" id="stat-green">—</div></div></div>
+      <div class="stat-tile"><div class="dot yellow"></div><div><div class="label">Kollane</div><div class="value" id="stat-yellow">—</div></div></div>
+      <div class="stat-tile"><div class="dot red"></div><div><div class="label">Punane</div><div class="value" id="stat-red">—</div></div></div>
+      <div class="stat-tile"><div class="dot gray"></div><div><div class="label">Blokeeritud</div><div class="value" id="stat-gray">—</div></div></div>
+    </div>
+
+    <div class="clients-grid" id="clients-grid"></div>
+  </main>
+</div>
+
+<script>
+const SUPABASE_URL  = 'https://lpehwgpitfowhyiaxrhe.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWh3Z3BpdGZvd2h5aWF4cmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzE3NDIsImV4cCI6MjA5MjYwNzc0Mn0.VRAFWMrlyigtPlDVAk9KG2NiFLd1l5aRxwmNrariUfI';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let currentUser = null;
+let isAdmin = false;
+let clients = [];
+let tasks = [];
+let currentPeriod = todayPeriod();
+
+function todayPeriod() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function todayDate() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function shiftPeriod(period, delta) {
+  const [y, m] = period.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function daysBetween(isoDate) {
+  const today = new Date(todayDate() + 'T00:00:00');
+  const due = new Date(isoDate + 'T00:00:00');
+  return Math.round((due - today) / 86400000);
+}
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ── Status logic ─────────────────────────────────────────────────
+function clientStatus(clientTasks) {
+  if (clientTasks.length === 0) return 'green';
+  const open = clientTasks.filter(t => t.status !== 'done');
+  if (open.length === 0) return 'green';
+
+  const today = todayDate();
+  const hasOverdue = open.some(t => t.status !== 'blocked' && t.due_date < today);
+  const hasNear    = open.some(t => t.status !== 'blocked' && daysBetween(t.due_date) <= 3 && t.due_date >= today);
+  if (hasOverdue || hasNear) return 'red';
+
+  const allBlocked = open.every(t => t.status === 'blocked');
+  if (allBlocked) return 'gray';
+
+  return 'yellow';
+}
+
+function taskItemClass(t) {
+  if (t.status === 'done') return 'done';
+  const today = todayDate();
+  if (t.due_date < today) return 'overdue';
+  if (daysBetween(t.due_date) <= 3) return 'near';
+  return '';
+}
+
+function statusIcon(s) {
+  return { green: '🟢', yellow: '🟡', red: '🔴', gray: '⚪' }[s] || '';
+}
+
+// ── Init ─────────────────────────────────────────────────────────
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = '../'; return; }
+  currentUser = session.user;
+
+  const { data: adminRow } = await sb.from('admins').select('user_id').eq('user_id', currentUser.id).maybeSingle();
+  isAdmin = !!adminRow;
+  if (!isAdmin) {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('denied-screen').style.display = 'flex';
+    return;
+  }
+
+  await loadClients();
+  await loadTasks();
+
+  document.getElementById('period-input').value = currentPeriod;
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  bindUIEvents();
+  render();
+
+  sb.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT') window.location.href = '../';
+  });
+}
+
+async function loadClients() {
+  const { data, error } = await sb.from('clients').select('id, name').order('name');
+  if (error) { console.error('clients:', error); return; }
+  clients = data || [];
+}
+
+async function loadTasks() {
+  const { data, error } = await sb.from('task_instances')
+    .select('id, client_id, name, due_date, status, period')
+    .eq('period', currentPeriod);
+  if (error) { console.error('tasks:', error); tasks = []; return; }
+  tasks = data || [];
+}
+
+// ── Render ───────────────────────────────────────────────────────
+function render() {
+  const grouped = {};
+  clients.forEach(c => { grouped[c.id] = []; });
+  tasks.forEach(t => {
+    if (!grouped[t.client_id]) grouped[t.client_id] = [];
+    grouped[t.client_id].push(t);
+  });
+
+  const cards = clients.map(c => {
+    const cTasks = grouped[c.id] || [];
+    const status = clientStatus(cTasks);
+    return { client: c, tasks: cTasks, status };
+  });
+
+  // Stats
+  const counts = { green: 0, yellow: 0, red: 0, gray: 0 };
+  cards.forEach(x => counts[x.status]++);
+  document.getElementById('stat-green').textContent  = counts.green;
+  document.getElementById('stat-yellow').textContent = counts.yellow;
+  document.getElementById('stat-red').textContent    = counts.red;
+  document.getElementById('stat-gray').textContent   = counts.gray;
+
+  // Banner
+  const banner = document.getElementById('red-banner');
+  if (counts.red > 0) {
+    banner.classList.add('visible');
+    document.getElementById('red-count').textContent = counts.red;
+    document.getElementById('red-text').textContent = counts.red === 1
+      ? 'klient vajab tähelepanu (üle tähtaja või tähtaeg ≤ 3 päeva).'
+      : 'klienti vajavad tähelepanu (üle tähtaja või tähtaeg ≤ 3 päeva).';
+  } else {
+    banner.classList.remove('visible');
+  }
+
+  // Sort: red → yellow → gray → green
+  const order = { red: 0, yellow: 1, gray: 2, green: 3 };
+  cards.sort((a, b) => {
+    if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
+    return a.client.name.localeCompare(b.client.name);
+  });
+
+  const grid = document.getElementById('clients-grid');
+  if (cards.length === 0) {
+    grid.innerHTML = '<div class="empty-msg">Kliente pole.</div>';
+    return;
+  }
+
+  grid.innerHTML = cards.map(x => renderCard(x)).join('');
+
+  grid.querySelectorAll('[data-client]').forEach(el => {
+    el.addEventListener('click', () => {
+      window.location.href = `tasks.html?client=${el.dataset.client}&period=${currentPeriod}`;
+    });
+  });
+}
+
+function renderCard({ client, tasks: cTasks, status }) {
+  const total = cTasks.length;
+  const done  = cTasks.filter(t => t.status === 'done').length;
+  const open  = cTasks.filter(t => t.status !== 'done');
+  const pct   = total === 0 ? 0 : Math.round((done / total) * 100);
+
+  // Sort tasks for display: overdue → near → blocked → todo → done
+  const today = todayDate();
+  const sortedTasks = cTasks.slice().sort((a, b) => {
+    const cls = (t) => {
+      if (t.status === 'done') return 4;
+      if (t.status === 'blocked') return 2;
+      if (t.due_date < today) return 0;
+      if (daysBetween(t.due_date) <= 3) return 1;
+      return 3;
+    };
+    if (cls(a) !== cls(b)) return cls(a) - cls(b);
+    return a.due_date.localeCompare(b.due_date);
+  });
+
+  let body;
+  if (total === 0) {
+    body = '<div class="empty-msg" style="padding:14px 0;font-size:13px">Selle kuu jaoks pole ülesandeid.</div>';
+  } else if (open.length === 0) {
+    body = '<div class="all-done">✓ Kõik tehtud</div>';
+  } else {
+    // Show open tasks first, max 6, then "+N more done"
+    const visible = sortedTasks.filter(t => t.status !== 'done').slice(0, 6);
+    const hiddenDone = done;
+    body = `
+      <div class="task-list">
+        ${visible.map(t => `
+          <div class="task-item ${taskItemClass(t)}">
+            <span class="task-icon">${
+              t.status === 'blocked' ? '⚪' :
+              t.due_date < today ? '🔴' :
+              daysBetween(t.due_date) <= 3 ? '🟡' : '🟢'
+            }</span>
+            <span class="task-name">${escapeHtml(t.name)}</span>
+            <span class="task-due">${fmtDate(t.due_date)}</span>
+          </div>
+        `).join('')}
+        ${hiddenDone > 0 ? `<div class="task-item done"><span class="task-icon">✓</span><span class="task-name">+${hiddenDone} tehtud</span></div>` : ''}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="client-card status-${status}" data-client="${client.id}">
+      <div class="card-header">
+        <div class="client-name">${escapeHtml(client.name)}</div>
+        <div class="status-icon">${statusIcon(status)}</div>
+      </div>
+      ${total > 0 ? `
+        <div class="progress-row">
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+          <div class="progress-text">${done} / ${total}</div>
+        </div>
+      ` : ''}
+      ${body}
+    </div>
+  `;
+}
+
+function bindUIEvents() {
+  document.getElementById('logout-btn').addEventListener('click', () => sb.auth.signOut());
+
+  document.getElementById('period-input').addEventListener('change', async (e) => {
+    currentPeriod = e.target.value;
+    await loadTasks();
+    render();
+  });
+  document.getElementById('prev-period-btn').addEventListener('click', async () => {
+    currentPeriod = shiftPeriod(currentPeriod, -1);
+    document.getElementById('period-input').value = currentPeriod;
+    await loadTasks();
+    render();
+  });
+  document.getElementById('next-period-btn').addEventListener('click', async () => {
+    currentPeriod = shiftPeriod(currentPeriod, +1);
+    document.getElementById('period-input').value = currentPeriod;
+    await loadTasks();
+    render();
+  });
+  document.getElementById('this-period-btn').addEventListener('click', async () => {
+    currentPeriod = todayPeriod();
+    document.getElementById('period-input').value = currentPeriod;
+    await loadTasks();
+    render();
+  });
+}
+
+init();
+</script>
+</body>
+</html>

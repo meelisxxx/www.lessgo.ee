@@ -336,6 +336,7 @@
       <span class="header-title">Skoor<span class="badge">ADMIN</span></span>
     </a>
     <div class="header-right">
+      <a href="index.html" class="nav-link">Status</a>
       <a href="timer.html" class="nav-link">Tööaeg</a>
       <a href="tasks.html" class="nav-link active">Ülesanded</a>
       <a href="clients.html" class="nav-link">Kliendid</a>
@@ -488,6 +489,12 @@ let admins = [];
 let tasks = [];
 let currentPeriod = todayPeriod();
 
+// URL parameetrid (nt index.html'ist klikates: ?client=ID&period=YYYY-MM)
+const urlParams = new URLSearchParams(window.location.search);
+const initialClientFilter = urlParams.get('client') || '';
+const urlPeriod = urlParams.get('period');
+if (urlPeriod && /^\d{4}-\d{2}$/.test(urlPeriod)) currentPeriod = urlPeriod;
+
 // ── Helpers ─────────────────────────────────────────────────────
 function todayPeriod() {
   const d = new Date();
@@ -608,6 +615,12 @@ async function init() {
   populateClientDropdowns();
 
   document.getElementById('period-input').value = currentPeriod;
+
+  // URL'ist tulev client filter
+  if (initialClientFilter) {
+    document.getElementById('filter-client').value = initialClientFilter;
+    renderTable();
+  }
 
   document.getElementById('loading-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
