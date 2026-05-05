@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skoor Admin — Mallid</title>
+  <link rel="icon" type="image/png" href="../../Logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #111827;
+      --bg2:      #1f2937;
+      --bg3:      #374151;
+      --border:   rgba(255,255,255,0.08);
+      --text:     #f9fafb;
+      --text2:    #9ca3af;
+      --text3:    #6b7280;
+      --accent:   #10b981;
+      --pos:      #10b981;
+      --neg:      #ef4444;
+      --warn:     #f59e0b;
+      --info:     #818cf8;
+      --radius:   12px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { opacity: 0.8; }
+
+    #loading-screen, #denied-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      text-align: center;
+    }
+    #denied-screen h2 { color: var(--neg); margin-bottom: 12px; }
+    #denied-screen p { color: var(--text2); margin-bottom: 24px; }
+
+    #app { display: none; flex-direction: column; min-height: 100vh; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-logo { width: 36px; height: 36px; border-radius: 50%; }
+    .header-title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
+    .header-title .badge {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-left: 8px;
+      vertical-align: middle;
+      letter-spacing: 1px;
+    }
+    .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    .nav-link {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text2);
+      font-size: 13px;
+    }
+    .nav-link:hover { color: var(--text); border-color: var(--text2); opacity: 1; }
+    .nav-link.active { color: var(--text); border-color: var(--accent); background: rgba(16,185,129,0.08); }
+
+    button {
+      cursor: pointer;
+      font-family: inherit;
+      border: none;
+      border-radius: 8px;
+      transition: opacity 0.2s, background 0.2s;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 18px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+    .btn-secondary {
+      background: var(--bg3);
+      color: var(--text);
+      padding: 8px 14px;
+      font-size: 13px;
+    }
+    .btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+    .btn-danger {
+      background: var(--neg);
+      color: #fff;
+      padding: 10px 18px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .btn-danger:hover:not(:disabled) { opacity: 0.9; }
+    .btn-icon {
+      background: transparent;
+      color: var(--text2);
+      padding: 4px 8px;
+      font-size: 14px;
+    }
+    .btn-icon:hover { color: var(--text); }
+
+    select, input[type="text"], input[type="number"], textarea {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color 0.2s;
+      width: 100%;
+    }
+    select:focus, input:focus, textarea:focus { border-color: var(--accent); }
+    label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    main { padding: 24px; max-width: 1100px; margin: 0 auto; width: 100%; }
+
+    .page-intro {
+      color: var(--text2);
+      font-size: 14px;
+      margin-bottom: 20px;
+      max-width: 800px;
+    }
+
+    .toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .templates-scroll { overflow-x: auto; }
+    .templates-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 760px; }
+    .templates-table th { text-align: left; color: var(--text3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; padding: 0 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .templates-table td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: top; }
+    .templates-table tr:not(.row-disabled) { cursor: pointer; }
+    .templates-table tr:not(.row-disabled):hover td { background: rgba(255,255,255,0.02); }
+    .templates-table tr.row-disabled td { opacity: 0.45; }
+    .templates-table .col-name strong { font-weight: 600; }
+    .templates-table .col-name .desc { display: block; font-size: 12px; color: var(--text3); margin-top: 2px; }
+    .templates-table .col-num { text-align: center; font-variant-numeric: tabular-nums; }
+    .templates-table .col-actions { text-align: right; white-space: nowrap; }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .pill.priority-high   { background: rgba(239,68,68,0.15);  color: var(--neg); }
+    .pill.priority-medium { background: rgba(245,158,11,0.15); color: var(--warn); }
+    .pill.priority-low    { background: rgba(156,163,175,0.15); color: var(--text2); }
+    .pill.recur-monthly   { background: rgba(129,140,248,0.15); color: var(--info); }
+    .pill.recur-quarterly { background: rgba(99,102,241,0.18); color: #a5b4fc; }
+    .pill.recur-yearly    { background: rgba(16,185,129,0.15); color: var(--accent); }
+    .pill.recur-once      { background: rgba(255,255,255,0.05); color: var(--text2); border: 1px solid var(--border); }
+    .pill.active          { background: rgba(16,185,129,0.15); color: var(--accent); }
+    .pill.inactive        { background: rgba(255,255,255,0.05); color: var(--text3); border: 1px solid var(--border); }
+
+    .empty-msg { text-align: center; color: var(--text2); padding: 40px 0; }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      align-items: center; justify-content: center;
+      z-index: 100; padding: 20px;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      width: 100%; max-width: 520px;
+      max-height: 90vh; overflow-y: auto;
+    }
+    .modal h3 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+    .modal .modal-sub { font-size: 12px; color: var(--text2); margin-bottom: 18px; }
+    .modal .field { margin-bottom: 14px; }
+    .modal .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    .modal-actions.with-delete .btn-danger { margin-right: auto; }
+    .modal-error { color: var(--neg); font-size: 13px; margin-top: 8px; }
+
+    /* Active toggle */
+    .toggle-wrap { display: flex; align-items: center; gap: 10px; }
+    .toggle {
+      position: relative;
+      width: 42px; height: 24px;
+      background: var(--bg3);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 18px; height: 18px;
+      background: #fff;
+      border-radius: 50%;
+      transition: left 0.2s;
+    }
+    .toggle.on { background: var(--accent); }
+    .toggle.on::after { left: 21px; }
+    .toggle-label { font-size: 14px; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 16px;
+      font-size: 13px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+      z-index: 1000;
+      transform: translateY(100px); opacity: 0;
+      transition: transform 0.25s, opacity 0.25s;
+    }
+    .toast.visible { transform: translateY(0); opacity: 1; }
+    .toast.success { border-color: rgba(16,185,129,0.4); }
+    .toast.error   { border-color: rgba(239,68,68,0.4); color: var(--neg); }
+
+    @media (max-width: 640px) {
+      header { padding: 12px 16px; }
+      main { padding: 16px; }
+      .modal .field-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading-screen" style="display:flex">
+  <p style="color: var(--text2)">Laen...</p>
+</div>
+
+<div id="denied-screen">
+  <h2>Ligipääs keelatud</h2>
+  <p>Sul pole admin õigusi.</p>
+  <a href="../" class="nav-link">← Skoor avalehele</a>
+</div>
+
+<div id="app">
+  <header>
+    <a href="../" class="header-left" style="color:inherit">
+      <img src="../../Logo.png" alt="LessGo" class="header-logo">
+      <span class="header-title">Skoor<span class="badge">ADMIN</span></span>
+    </a>
+    <div class="header-right">
+      <a href="timer.html" class="nav-link">Tööaeg</a>
+      <a href="tasks.html" class="nav-link">Ülesanded</a>
+      <a href="clients.html" class="nav-link">Kliendid</a>
+      <a href="templates.html" class="nav-link active">Mallid</a>
+      <a href="../" class="nav-link">← Klientide vaade</a>
+      <button class="btn-secondary" id="logout-btn">Logi välja</button>
+    </div>
+  </header>
+
+  <main>
+    <p class="page-intro">
+      Mallid on globaalsed töö-tüübid (Palgaarvestus, TSD, KMD jne). Klientide kaartidel saad iga
+      malli linnukesega aktiveerida — siis genereerib n8n cron iga kuu 1. kuup. selle malli põhjal
+      ülesandeid neile klientidele. Ad-hoc ülesannet pole vaja mallini panna.
+    </p>
+
+    <div class="toolbar">
+      <button class="btn-primary" id="new-btn">+ Lisa mall</button>
+    </div>
+
+    <div class="card">
+      <div class="templates-scroll">
+        <table class="templates-table" id="templates-table">
+          <thead>
+            <tr>
+              <th>Nimi</th>
+              <th class="col-num">Tähtaja päev</th>
+              <th>Prioriteet</th>
+              <th>Korduvus</th>
+              <th class="col-num">Sort</th>
+              <th>Aktiivne</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Edit / new template modal -->
+<div class="modal-overlay" id="tpl-modal">
+  <div class="modal">
+    <h3 id="tpl-modal-title">Lisa mall</h3>
+    <p class="modal-sub" id="tpl-modal-sub">&nbsp;</p>
+    <input type="hidden" id="tpl-id">
+
+    <div class="field">
+      <label for="tpl-name">Nimi *</label>
+      <input type="text" id="tpl-name" placeholder="nt 'Aastaaruanne'">
+    </div>
+    <div class="field">
+      <label for="tpl-description">Kirjeldus</label>
+      <textarea id="tpl-description" rows="2"></textarea>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="tpl-due-day">Tähtaja päev (järgmise kuu) *</label>
+        <input type="number" id="tpl-due-day" min="1" max="31" placeholder="nt 10">
+      </div>
+      <div class="field">
+        <label for="tpl-priority">Prioriteet *</label>
+        <select id="tpl-priority">
+          <option value="high">Kõrge</option>
+          <option value="medium" selected>Keskmine</option>
+          <option value="low">Madal</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="tpl-recurrence">Korduvus *</label>
+        <select id="tpl-recurrence">
+          <option value="monthly">Igakuine</option>
+          <option value="quarterly">Kvartaalne</option>
+          <option value="yearly">Aastane</option>
+          <option value="once">Ühekordne</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="tpl-sort">Sort (väiksem = eespool)</label>
+        <input type="number" id="tpl-sort" value="100">
+      </div>
+    </div>
+    <div class="field">
+      <div class="toggle-wrap">
+        <div class="toggle on" id="tpl-active-toggle"></div>
+        <span class="toggle-label" id="tpl-active-label">Aktiivne</span>
+      </div>
+    </div>
+    <p class="modal-error" id="tpl-modal-error"></p>
+    <div class="modal-actions with-delete">
+      <button class="btn-danger" id="tpl-delete-btn" style="display:none">🗑 Kustuta</button>
+      <button class="btn-secondary" data-dismiss="tpl-modal">Tühista</button>
+      <button class="btn-primary" id="tpl-save-btn">Salvesta</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL  = 'https://lpehwgpitfowhyiaxrhe.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWh3Z3BpdGZvd2h5aWF4cmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzE3NDIsImV4cCI6MjA5MjYwNzc0Mn0.VRAFWMrlyigtPlDVAk9KG2NiFLd1l5aRxwmNrariUfI';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let currentUser = null;
+let isAdmin = false;
+let templates = [];
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function priorityLabel(p) { return { high:'Kõrge', medium:'Keskmine', low:'Madal' }[p] || p; }
+function recurLabel(r)    { return { monthly:'Igakuine', quarterly:'Kvartaalne', yearly:'Aastane', once:'Ühekordne' }[r] || r; }
+
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} visible`;
+  clearTimeout(showToast._h);
+  showToast._h = setTimeout(() => t.classList.remove('visible'), 2200);
+}
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = '../'; return; }
+  currentUser = session.user;
+
+  const { data: adminRow } = await sb.from('admins').select('user_id').eq('user_id', currentUser.id).maybeSingle();
+  isAdmin = !!adminRow;
+  if (!isAdmin) {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('denied-screen').style.display = 'flex';
+    return;
+  }
+
+  await loadTemplates();
+
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  bindUIEvents();
+
+  sb.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT') window.location.href = '../';
+  });
+}
+
+async function loadTemplates() {
+  const { data, error } = await sb.from('task_templates')
+    .select('*')
+    .order('sort_order')
+    .order('name');
+  if (error) { console.error(error); return; }
+  templates = data || [];
+  render();
+}
+
+function render() {
+  const tbody = document.querySelector('#templates-table tbody');
+  if (templates.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-msg">Mallid puuduvad. Lisa esimene "+ Lisa mall" nupuga.</div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = templates.map(t => `
+    <tr class="${t.is_active ? '' : 'row-disabled'}" data-id="${t.id}">
+      <td class="col-name">
+        <strong>${escapeHtml(t.name)}</strong>
+        ${t.description ? `<span class="desc">${escapeHtml(t.description)}</span>` : ''}
+      </td>
+      <td class="col-num">${t.due_day_of_next_month ?? '—'}.</td>
+      <td><span class="pill priority-${t.default_priority}">${priorityLabel(t.default_priority)}</span></td>
+      <td><span class="pill recur-${t.recurrence}">${recurLabel(t.recurrence)}</span></td>
+      <td class="col-num">${t.sort_order}</td>
+      <td><span class="pill ${t.is_active ? 'active' : 'inactive'}">${t.is_active ? 'Jah' : 'Ei'}</span></td>
+      <td class="col-actions"><button class="btn-icon" data-edit="${t.id}" title="Muuda">✏</button></td>
+    </tr>
+  `).join('');
+
+  tbody.querySelectorAll('tr[data-id]').forEach(row => {
+    row.addEventListener('click', () => openEditModal(row.dataset.id));
+  });
+}
+
+// ── Modal ───────────────────────────────────────────────────────
+function openNewModal() {
+  document.getElementById('tpl-modal-title').textContent = 'Lisa mall';
+  document.getElementById('tpl-modal-sub').textContent = '';
+  document.getElementById('tpl-id').value = '';
+  document.getElementById('tpl-name').value = '';
+  document.getElementById('tpl-description').value = '';
+  document.getElementById('tpl-due-day').value = 10;
+  document.getElementById('tpl-priority').value = 'medium';
+  document.getElementById('tpl-recurrence').value = 'monthly';
+  document.getElementById('tpl-sort').value = 100;
+  setActiveToggle(true);
+  document.getElementById('tpl-delete-btn').style.display = 'none';
+  document.getElementById('tpl-modal-error').textContent = '';
+  showModal('tpl-modal');
+}
+
+function openEditModal(id) {
+  const t = templates.find(x => x.id === id);
+  if (!t) return;
+
+  document.getElementById('tpl-modal-title').textContent = 'Muuda malli';
+  document.getElementById('tpl-modal-sub').textContent = 'Kustutamine eemaldab ka kõikide klientide tellimused (subscriptions). Olemasolevad ülesannete instantsid jäävad alles ad-hoc tüübina.';
+  document.getElementById('tpl-id').value = t.id;
+  document.getElementById('tpl-name').value = t.name;
+  document.getElementById('tpl-description').value = t.description || '';
+  document.getElementById('tpl-due-day').value = t.due_day_of_next_month ?? '';
+  document.getElementById('tpl-priority').value = t.default_priority;
+  document.getElementById('tpl-recurrence').value = t.recurrence;
+  document.getElementById('tpl-sort').value = t.sort_order;
+  setActiveToggle(t.is_active);
+  document.getElementById('tpl-delete-btn').style.display = '';
+  document.getElementById('tpl-modal-error').textContent = '';
+  showModal('tpl-modal');
+}
+
+function setActiveToggle(on) {
+  const t = document.getElementById('tpl-active-toggle');
+  const l = document.getElementById('tpl-active-label');
+  if (on) { t.classList.add('on'); l.textContent = 'Aktiivne'; }
+  else    { t.classList.remove('on'); l.textContent = 'Mitteaktiivne'; }
+}
+
+function isActiveOn() {
+  return document.getElementById('tpl-active-toggle').classList.contains('on');
+}
+
+async function saveTemplate() {
+  const id          = document.getElementById('tpl-id').value;
+  const name        = document.getElementById('tpl-name').value.trim();
+  const description = document.getElementById('tpl-description').value.trim() || null;
+  const dueDayRaw   = document.getElementById('tpl-due-day').value;
+  const priority    = document.getElementById('tpl-priority').value;
+  const recurrence  = document.getElementById('tpl-recurrence').value;
+  const sortOrder   = parseInt(document.getElementById('tpl-sort').value, 10);
+  const isActive    = isActiveOn();
+
+  if (!name) return showError('Sisesta nimi.');
+  const dueDay = dueDayRaw === '' ? null : parseInt(dueDayRaw, 10);
+  if (dueDay !== null && (isNaN(dueDay) || dueDay < 1 || dueDay > 31)) return showError('Tähtaja päev peab olema 1–31.');
+  if (isNaN(sortOrder)) return showError('Sort peab olema arv.');
+
+  const payload = {
+    name, description,
+    default_priority: priority,
+    due_day_of_next_month: dueDay,
+    recurrence,
+    sort_order: sortOrder,
+    is_active: isActive
+  };
+
+  const btn = document.getElementById('tpl-save-btn');
+  btn.disabled = true;
+
+  let error;
+  if (id) {
+    ({ error } = await sb.from('task_templates').update(payload).eq('id', id));
+  } else {
+    payload.created_by = currentUser.id;
+    ({ error } = await sb.from('task_templates').insert(payload));
+  }
+  btn.disabled = false;
+
+  if (error) return showError('Viga: ' + error.message);
+
+  hideModal('tpl-modal');
+  showToast(id ? 'Mall uuendatud' : 'Mall lisatud');
+  await loadTemplates();
+}
+
+async function deleteTemplate() {
+  const id = document.getElementById('tpl-id').value;
+  if (!id) return;
+  const t = templates.find(x => x.id === id);
+  if (!confirm(`Kustuta mall "${t?.name || '?'}" lõplikult?\n\nKõik klientide tellimused selle malli kohta eemaldatakse. Olemasolevad ülesannete instantsid jäävad alles ad-hoc tüübina.`)) return;
+
+  const btn = document.getElementById('tpl-delete-btn');
+  btn.disabled = true;
+  const { error } = await sb.from('task_templates').delete().eq('id', id);
+  btn.disabled = false;
+
+  if (error) return showError('Viga: ' + error.message);
+  hideModal('tpl-modal');
+  showToast('Mall kustutatud');
+  await loadTemplates();
+}
+
+function showError(msg) { document.getElementById('tpl-modal-error').textContent = msg; }
+function showModal(id) { document.getElementById(id).classList.add('visible'); }
+function hideModal(id) { document.getElementById(id).classList.remove('visible'); }
+
+function bindUIEvents() {
+  document.getElementById('logout-btn').addEventListener('click', () => sb.auth.signOut());
+  document.getElementById('new-btn').addEventListener('click', openNewModal);
+  document.getElementById('tpl-save-btn').addEventListener('click', saveTemplate);
+  document.getElementById('tpl-delete-btn').addEventListener('click', deleteTemplate);
+  document.getElementById('tpl-active-toggle').addEventListener('click', () => setActiveToggle(!isActiveOn()));
+
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.classList.remove('visible');
+    });
+  });
+  document.querySelectorAll('[data-dismiss]').forEach(btn => {
+    btn.addEventListener('click', () => hideModal(btn.dataset.dismiss));
+  });
+}
+
+init();
+</script>
+</body>
+</html>
