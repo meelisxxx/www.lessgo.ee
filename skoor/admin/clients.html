@@ -244,6 +244,71 @@
       padding: 20px 0;
     }
 
+    /* ── Doc päring ── */
+    .doc-section {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .doc-section .doc-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .doc-section .doc-title {
+      font-size: 12px;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 600;
+    }
+    .doc-section .doc-status {
+      font-size: 12px;
+      color: var(--text2);
+      margin-left: auto;
+      font-variant-numeric: tabular-nums;
+    }
+    .doc-section .doc-status.recent  { color: var(--accent); }
+    .doc-section .doc-status.stale   { color: var(--warn); }
+    .doc-section textarea {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      padding: 8px 10px;
+      outline: none;
+      width: 100%;
+      resize: vertical;
+      min-height: 36px;
+      transition: border-color 0.2s;
+    }
+    .doc-section textarea:focus { border-color: var(--accent); }
+    .doc-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .doc-actions button {
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .btn-doc-ask {
+      background: var(--info);
+      color: #fff;
+    }
+    .btn-doc-ask:hover:not(:disabled) { opacity: 0.9; }
+    .btn-doc-clear {
+      background: transparent;
+      color: var(--text2);
+      border: 1px solid var(--border);
+    }
+    .btn-doc-clear:hover:not(:disabled) { color: var(--text); border-color: var(--text2); }
+
     /* ── Toast ── */
     .toast {
       position: fixed;
@@ -327,6 +392,7 @@ let clients = [];
 let templates = [];
 let rates = {};                       // client_id → rate row
 let subscriptions = {};               // `${client_id}|${template_id}` → subscription row
+let docRequests = {};                 // client_id → doc request row
 let saveTimers = {};                  // debounce timers per (client, template, field)
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -372,7 +438,7 @@ async function init() {
     return;
   }
 
-  await Promise.all([loadClients(), loadTemplates(), loadRates(), loadSubscriptions()]);
+  await Promise.all([loadClients(), loadTemplates(), loadRates(), loadSubscriptions(), loadDocRequests()]);
 
   document.getElementById('loading-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
@@ -416,6 +482,25 @@ async function loadSubscriptions() {
   });
 }
 
+async function loadDocRequests() {
+  const { data, error } = await sb.from('client_doc_requests').select('*');
+  if (error) { console.error('doc_requests:', error); return; }
+  docRequests = {};
+  (data || []).forEach(d => { docRequests[d.client_id] = d; });
+}
+
+function fmtDocDate(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+}
+
+function daysAgo(iso) {
+  if (!iso) return null;
+  const ms = Date.now() - new Date(iso).getTime();
+  return Math.floor(ms / 86400000);
+}
+
 // ── Render ──────────────────────────────────────────────────────
 function render() {
   const grid = document.getElementById('clients-grid');
@@ -435,6 +520,15 @@ function render() {
   });
   grid.querySelectorAll('[data-priority-input]').forEach(el => {
     el.addEventListener('change', () => saveOverride(el.dataset.client, el.dataset.template, 'custom_priority', el.value));
+  });
+  grid.querySelectorAll('[data-doc-note]').forEach(el => {
+    el.addEventListener('input', () => debounceSaveDocNote(el.dataset.client, el.value));
+  });
+  grid.querySelectorAll('[data-doc-ask]').forEach(el => {
+    el.addEventListener('click', () => askDocs(el.dataset.client));
+  });
+  grid.querySelectorAll('[data-doc-clear]').forEach(el => {
+    el.addEventListener('click', () => clearDocs(el.dataset.client));
   });
 }
 
@@ -459,6 +553,41 @@ function renderClientCard(client) {
       </div>
       <div class="templates-list">
         ${rows || '<div class="empty-msg">Mallid puuduvad.</div>'}
+      </div>
+      ${renderDocSection(client)}
+    </div>
+  `;
+}
+
+function renderDocSection(client) {
+  const dr = docRequests[client.id];
+  const lastAt = dr?.last_request_at;
+  const note = dr?.last_request_note ?? '';
+
+  let statusHtml = '<span class="doc-status">— ei küsitud —</span>';
+  if (lastAt) {
+    const dStr = fmtDocDate(lastAt);
+    const ago = daysAgo(lastAt);
+    let cls = 'recent';
+    if (ago >= 7)  cls = 'stale';
+    let agoLabel;
+    if (ago === 0)      agoLabel = 'täna';
+    else if (ago === 1) agoLabel = 'eile';
+    else                agoLabel = `${ago} p tagasi`;
+    statusHtml = `<span class="doc-status ${cls}">küsitud ${agoLabel} (${dStr})</span>`;
+  }
+
+  return `
+    <div class="doc-section">
+      <div class="doc-header">
+        <span>📄</span>
+        <span class="doc-title">Dokumendid</span>
+        ${statusHtml}
+      </div>
+      <textarea data-doc-note="1" data-client="${client.id}" rows="2" placeholder="Märkus (nt 'Ootame ostuarvet')">${escapeHtml(note)}</textarea>
+      <div class="doc-actions">
+        <button class="btn-doc-ask" data-doc-ask="1" data-client="${client.id}">📨 Küsisin täna</button>
+        ${lastAt ? `<button class="btn-doc-clear" data-doc-clear="1" data-client="${client.id}">✓ Saadud / tühjenda</button>` : ''}
       </div>
     </div>
   `;
@@ -577,6 +706,80 @@ async function saveOverride(clientId, templateId, field, rawValue) {
   }
   sub[field] = value;
   showToast('Salvestatud');
+}
+
+// ── Doc requests ────────────────────────────────────────────────
+function debounceSaveDocNote(clientId, value) {
+  const key = `doc-note|${clientId}`;
+  clearTimeout(saveTimers[key]);
+  saveTimers[key] = setTimeout(() => saveDocNote(clientId, value), 600);
+}
+
+async function saveDocNote(clientId, rawValue) {
+  const value = (rawValue || '').trim() || null;
+  const dr = docRequests[clientId];
+
+  // Kui ei ole rida ja märkus tühi → ei tee midagi
+  if (!dr && !value) return;
+
+  const payload = {
+    client_id: clientId,
+    last_request_note: value,
+    updated_at: new Date().toISOString(),
+    updated_by: currentUser.id
+  };
+
+  // Säilita olemasolev last_request_at upsertiga
+  if (dr) payload.last_request_at = dr.last_request_at;
+
+  const { data, error } = await sb.from('client_doc_requests')
+    .upsert(payload, { onConflict: 'client_id' })
+    .select()
+    .single();
+
+  if (error) { showToast('Viga: ' + error.message, 'error'); return; }
+  docRequests[clientId] = data;
+  showToast('Märkus salvestatud');
+}
+
+async function askDocs(clientId) {
+  const dr = docRequests[clientId];
+  const note = dr?.last_request_note ?? null;
+
+  // Päris-aja salvestus, et UI noteid mitte üle kirjutada — võta DOM'ist viimane
+  const noteEl = document.querySelector(`[data-doc-note][data-client="${clientId}"]`);
+  const currentNote = noteEl ? (noteEl.value.trim() || null) : note;
+
+  const payload = {
+    client_id: clientId,
+    last_request_at: new Date().toISOString(),
+    last_request_note: currentNote,
+    updated_at: new Date().toISOString(),
+    updated_by: currentUser.id
+  };
+
+  const { data, error } = await sb.from('client_doc_requests')
+    .upsert(payload, { onConflict: 'client_id' })
+    .select()
+    .single();
+
+  if (error) { showToast('Viga: ' + error.message, 'error'); return; }
+  docRequests[clientId] = data;
+  showToast('Märgitud küsituks');
+  render();
+}
+
+async function clearDocs(clientId) {
+  if (!confirm('Tühjenda dokumentide päring? (märkus eemaldatakse ka)')) return;
+
+  const { error } = await sb.from('client_doc_requests')
+    .delete()
+    .eq('client_id', clientId);
+
+  if (error) { showToast('Viga: ' + error.message, 'error'); return; }
+  delete docRequests[clientId];
+  showToast('Tühjendatud');
+  render();
 }
 
 // ── UI ──────────────────────────────────────────────────────────

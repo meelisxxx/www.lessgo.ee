@@ -267,6 +267,27 @@
       font-weight: 600;
     }
 
+    .doc-flag {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-top: 10px;
+      padding: 8px 10px;
+      background: rgba(245,158,11,0.10);
+      border: 1px solid rgba(245,158,11,0.25);
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--text2);
+    }
+    .doc-flag.recent {
+      background: rgba(129,140,248,0.10);
+      border-color: rgba(129,140,248,0.25);
+    }
+    .doc-flag .doc-icon { flex-shrink: 0; }
+    .doc-flag .doc-msg { flex: 1; min-width: 0; }
+    .doc-flag .doc-msg strong { color: var(--text); }
+    .doc-flag .doc-msg .doc-note { display: block; font-size: 11px; color: var(--text3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
     .empty-msg { text-align: center; color: var(--text2); padding: 40px 0; }
 
     @media (max-width: 640px) {
@@ -340,6 +361,7 @@ let currentUser = null;
 let isAdmin = false;
 let clients = [];
 let tasks = [];
+let docRequests = {};
 let currentPeriod = todayPeriod();
 
 function todayPeriod() {
@@ -414,6 +436,7 @@ async function init() {
 
   await loadClients();
   await loadTasks();
+  await loadDocRequests();
 
   document.getElementById('period-input').value = currentPeriod;
   document.getElementById('loading-screen').style.display = 'none';
@@ -439,6 +462,19 @@ async function loadTasks() {
     .eq('period', currentPeriod);
   if (error) { console.error('tasks:', error); tasks = []; return; }
   tasks = data || [];
+}
+
+async function loadDocRequests() {
+  const { data, error } = await sb.from('client_doc_requests').select('*');
+  if (error) { console.error('doc_requests:', error); return; }
+  docRequests = {};
+  (data || []).forEach(d => { docRequests[d.client_id] = d; });
+}
+
+function docDaysAgo(iso) {
+  if (!iso) return null;
+  const ms = Date.now() - new Date(iso).getTime();
+  return Math.floor(ms / 86400000);
 }
 
 // ── Render ───────────────────────────────────────────────────────
@@ -558,6 +594,28 @@ function renderCard({ client, tasks: cTasks, status }) {
         </div>
       ` : ''}
       ${body}
+      ${renderDocFlag(client)}
+    </div>
+  `;
+}
+
+function renderDocFlag(client) {
+  const dr = docRequests[client.id];
+  if (!dr || !dr.last_request_at) return '';
+  const ago = docDaysAgo(dr.last_request_at);
+  let label;
+  if (ago === 0)      label = 'täna';
+  else if (ago === 1) label = 'eile';
+  else                label = `${ago} p tagasi`;
+  const cls = ago >= 7 ? '' : 'recent';
+  const note = dr.last_request_note;
+  return `
+    <div class="doc-flag ${cls}">
+      <span class="doc-icon">📄</span>
+      <div class="doc-msg">
+        <strong>Dokumentide päring:</strong> küsitud ${label}
+        ${note ? `<span class="doc-note">${escapeHtml(note)}</span>` : ''}
+      </div>
     </div>
   `;
 }
