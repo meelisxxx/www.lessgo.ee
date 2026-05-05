@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skoor Admin — Kliendid</title>
+  <link rel="icon" type="image/png" href="../../Logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #111827;
+      --bg2:      #1f2937;
+      --bg3:      #374151;
+      --border:   rgba(255,255,255,0.08);
+      --text:     #f9fafb;
+      --text2:    #9ca3af;
+      --text3:    #6b7280;
+      --accent:   #10b981;
+      --pos:      #10b981;
+      --neg:      #ef4444;
+      --warn:     #f59e0b;
+      --info:     #818cf8;
+      --radius:   12px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { opacity: 0.8; }
+
+    /* ── Loading / access ── */
+    #loading-screen, #denied-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      text-align: center;
+    }
+    #denied-screen h2 { color: var(--neg); margin-bottom: 12px; }
+    #denied-screen p { color: var(--text2); margin-bottom: 24px; }
+
+    /* ── Header ── */
+    #app { display: none; flex-direction: column; min-height: 100vh; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-logo { width: 36px; height: 36px; border-radius: 50%; }
+    .header-title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
+    .header-title .badge {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-left: 8px;
+      vertical-align: middle;
+      letter-spacing: 1px;
+    }
+    .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    .nav-link {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text2);
+      font-size: 13px;
+    }
+    .nav-link:hover { color: var(--text); border-color: var(--text2); opacity: 1; }
+    .nav-link.active { color: var(--text); border-color: var(--accent); background: rgba(16,185,129,0.08); }
+
+    button {
+      cursor: pointer;
+      font-family: inherit;
+      border: none;
+      border-radius: 8px;
+      transition: opacity 0.2s, background 0.2s;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary {
+      background: var(--bg3);
+      color: var(--text);
+      padding: 8px 14px;
+      font-size: 13px;
+    }
+    .btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+
+    select, input[type="number"] {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      padding: 5px 8px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    select:focus, input:focus { border-color: var(--accent); }
+
+    main { padding: 24px; max-width: 1200px; margin: 0 auto; width: 100%; }
+
+    .page-intro {
+      color: var(--text2);
+      font-size: 14px;
+      margin-bottom: 20px;
+      max-width: 800px;
+    }
+
+    /* ── Cards grid ── */
+    .clients-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+      gap: 18px;
+    }
+
+    .client-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+    }
+    .client-card-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .client-name { font-size: 17px; font-weight: 600; }
+    .client-rate {
+      font-size: 13px;
+      color: var(--accent);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .client-rate.missing { color: var(--warn); }
+
+    .templates-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .template-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 10px;
+      background: var(--bg3);
+      border-radius: 8px;
+      transition: background 0.15s;
+    }
+    .template-row.active {
+      background: rgba(16,185,129,0.08);
+      border: 1px solid rgba(16,185,129,0.25);
+      padding: 7px 9px;
+    }
+    .template-row.subscribing { opacity: 0.55; pointer-events: none; }
+
+    .checkbox {
+      width: 20px;
+      height: 20px;
+      border: 1.5px solid var(--text3);
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: #fff;
+      background: transparent;
+      transition: border-color 0.2s, background 0.2s;
+      flex-shrink: 0;
+    }
+    .checkbox:hover { border-color: var(--accent); }
+    .checkbox.checked { background: var(--accent); border-color: var(--accent); }
+
+    .template-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .template-name { font-size: 14px; font-weight: 500; }
+    .template-meta { font-size: 11px; color: var(--text2); }
+    .template-meta .pill {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-left: 4px;
+    }
+    .pill.priority-high   { background: rgba(239,68,68,0.15);  color: var(--neg); }
+    .pill.priority-medium { background: rgba(245,158,11,0.15); color: var(--warn); }
+    .pill.priority-low    { background: rgba(156,163,175,0.15); color: var(--text2); }
+
+    .overrides {
+      display: none;
+      grid-template-columns: auto auto;
+      gap: 6px;
+      align-items: center;
+      font-size: 11px;
+    }
+    .template-row.active .overrides { display: grid; }
+    .overrides label { color: var(--text3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .overrides input[type="number"] { width: 60px; }
+    .overrides select { padding: 3px 6px; font-size: 12px; }
+
+    .empty-msg {
+      color: var(--text2);
+      font-size: 13px;
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 13px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+      z-index: 1000;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: transform 0.25s, opacity 0.25s;
+    }
+    .toast.visible { transform: translateY(0); opacity: 1; }
+    .toast.success { border-color: rgba(16,185,129,0.4); }
+    .toast.error   { border-color: rgba(239,68,68,0.4); color: var(--neg); }
+
+    @media (max-width: 640px) {
+      header { padding: 12px 16px; }
+      main { padding: 16px; }
+      .clients-grid { grid-template-columns: 1fr; }
+      .template-row { grid-template-columns: auto 1fr; }
+      .template-row.active .overrides { grid-column: 1 / -1; padding-top: 4px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading-screen" style="display:flex">
+  <p style="color: var(--text2)">Laen...</p>
+</div>
+
+<div id="denied-screen">
+  <h2>Ligipääs keelatud</h2>
+  <p>Sul pole admin õigusi.</p>
+  <a href="../" class="nav-link">← Skoor avalehele</a>
+</div>
+
+<div id="app">
+  <header>
+    <a href="../" class="header-left" style="color:inherit">
+      <img src="../../Logo.png" alt="LessGo" class="header-logo">
+      <span class="header-title">Skoor<span class="badge">ADMIN</span></span>
+    </a>
+    <div class="header-right">
+      <a href="timer.html" class="nav-link">Tööaeg</a>
+      <a href="tasks.html" class="nav-link">Ülesanded</a>
+      <a href="clients.html" class="nav-link active">Kliendid</a>
+      <a href="../" class="nav-link">← Klientide vaade</a>
+      <button class="btn-secondary" id="logout-btn">Logi välja</button>
+    </div>
+  </header>
+
+  <main>
+    <p class="page-intro">
+      Iga kliendi kaardil näed millised mallid on tellitud (linnuke = aktiivne).
+      Tähtaja päev ja prioriteet võtavad mallide vaikimisi väärtused, kui ei ole eraldi seatud.
+      Muudatused salvestatakse automaatselt.
+    </p>
+
+    <div class="clients-grid" id="clients-grid"></div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL  = 'https://lpehwgpitfowhyiaxrhe.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWh3Z3BpdGZvd2h5aWF4cmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzE3NDIsImV4cCI6MjA5MjYwNzc0Mn0.VRAFWMrlyigtPlDVAk9KG2NiFLd1l5aRxwmNrariUfI';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let currentUser = null;
+let isAdmin = false;
+let clients = [];
+let templates = [];
+let rates = {};                       // client_id → rate row
+let subscriptions = {};               // `${client_id}|${template_id}` → subscription row
+let saveTimers = {};                  // debounce timers per (client, template, field)
+
+// ── Helpers ─────────────────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function fmtEur(v) {
+  if (v == null) return '—';
+  return new Intl.NumberFormat('et-EE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v) + ' €';
+}
+
+function priorityLabel(p) {
+  return { high: 'Kõrge', medium: 'Keskmine', low: 'Madal' }[p] || p;
+}
+
+function subKey(clientId, templateId) {
+  return `${clientId}|${templateId}`;
+}
+
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} visible`;
+  clearTimeout(showToast._h);
+  showToast._h = setTimeout(() => t.classList.remove('visible'), 2200);
+}
+
+// ── Init ────────────────────────────────────────────────────────
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    window.location.href = '../';
+    return;
+  }
+  currentUser = session.user;
+
+  const { data: adminRow } = await sb.from('admins').select('user_id').eq('user_id', currentUser.id).maybeSingle();
+  isAdmin = !!adminRow;
+  if (!isAdmin) {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('denied-screen').style.display = 'flex';
+    return;
+  }
+
+  await Promise.all([loadClients(), loadTemplates(), loadRates(), loadSubscriptions()]);
+
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  render();
+  bindUIEvents();
+
+  sb.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT') window.location.href = '../';
+  });
+}
+
+async function loadClients() {
+  const { data, error } = await sb.from('clients').select('id, name').order('name');
+  if (error) { console.error('clients:', error); return; }
+  clients = data || [];
+}
+
+async function loadTemplates() {
+  const { data, error } = await sb.from('task_templates')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order');
+  if (error) { console.error('templates:', error); return; }
+  templates = data || [];
+}
+
+async function loadRates() {
+  const { data, error } = await sb.from('hourly_rates').select('*');
+  if (error) { console.error('rates:', error); return; }
+  rates = {};
+  (data || []).forEach(r => { rates[r.client_id] = r; });
+}
+
+async function loadSubscriptions() {
+  const { data, error } = await sb.from('client_task_subscriptions').select('*');
+  if (error) { console.error('subscriptions:', error); return; }
+  subscriptions = {};
+  (data || []).forEach(s => {
+    subscriptions[subKey(s.client_id, s.template_id)] = s;
+  });
+}
+
+// ── Render ──────────────────────────────────────────────────────
+function render() {
+  const grid = document.getElementById('clients-grid');
+  if (clients.length === 0) {
+    grid.innerHTML = '<div class="empty-msg">Kliente pole. Lisa esimene klient Skoor avalehel.</div>';
+    return;
+  }
+
+  grid.innerHTML = clients.map(c => renderClientCard(c)).join('');
+
+  // Bind events
+  grid.querySelectorAll('[data-toggle]').forEach(el => {
+    el.addEventListener('click', () => toggleSubscription(el.dataset.client, el.dataset.template));
+  });
+  grid.querySelectorAll('[data-due-input]').forEach(el => {
+    el.addEventListener('input', () => debounceSave(el.dataset.client, el.dataset.template, 'custom_due_day', el.value));
+  });
+  grid.querySelectorAll('[data-priority-input]').forEach(el => {
+    el.addEventListener('change', () => saveOverride(el.dataset.client, el.dataset.template, 'custom_priority', el.value));
+  });
+}
+
+function renderClientCard(client) {
+  const rate = rates[client.id];
+  let rateHtml;
+  if (!rate) {
+    rateHtml = '<span class="client-rate missing">hind puudub</span>';
+  } else if (rate.is_fixed_price) {
+    rateHtml = `<span class="client-rate">fix: ${fmtEur(rate.fixed_price_eur)}</span>`;
+  } else {
+    rateHtml = `<span class="client-rate">${fmtEur(rate.rate_eur)}/h</span>`;
+  }
+
+  const rows = templates.map(tpl => renderTemplateRow(client.id, tpl)).join('');
+
+  return `
+    <div class="client-card">
+      <div class="client-card-header">
+        <div class="client-name">${escapeHtml(client.name)}</div>
+        ${rateHtml}
+      </div>
+      <div class="templates-list">
+        ${rows || '<div class="empty-msg">Mallid puuduvad.</div>'}
+      </div>
+    </div>
+  `;
+}
+
+function renderTemplateRow(clientId, tpl) {
+  const sub = subscriptions[subKey(clientId, tpl.id)];
+  const isActive = sub?.is_active === true;
+  const dueDay = sub?.custom_due_day ?? '';
+  const priority = sub?.custom_priority ?? '';
+
+  return `
+    <div class="template-row ${isActive ? 'active' : ''}" data-row="${clientId}|${tpl.id}">
+      <button class="checkbox ${isActive ? 'checked' : ''}" data-toggle="1" data-client="${clientId}" data-template="${tpl.id}" title="${isActive ? 'Eemalda tellimus' : 'Lisa tellimus'}">
+        ${isActive ? '✓' : ''}
+      </button>
+      <div class="template-info">
+        <div class="template-name">${escapeHtml(tpl.name)}</div>
+        <div class="template-meta">
+          tähtaeg: järgmise kuu ${tpl.due_day_of_next_month}.
+          <span class="pill priority-${tpl.default_priority}">${priorityLabel(tpl.default_priority)}</span>
+        </div>
+      </div>
+      <div class="overrides">
+        <label>Erinev päev:</label>
+        <input type="number" min="1" max="31" data-due-input="1" data-client="${clientId}" data-template="${tpl.id}" value="${dueDay}" placeholder="${tpl.due_day_of_next_month}">
+        <label>Erinev prio:</label>
+        <select data-priority-input="1" data-client="${clientId}" data-template="${tpl.id}">
+          <option value="" ${!priority ? 'selected' : ''}>— vaikimisi —</option>
+          <option value="high"   ${priority==='high'   ? 'selected' : ''}>Kõrge</option>
+          <option value="medium" ${priority==='medium' ? 'selected' : ''}>Keskmine</option>
+          <option value="low"    ${priority==='low'    ? 'selected' : ''}>Madal</option>
+        </select>
+      </div>
+    </div>
+  `;
+}
+
+// ── Mutations ───────────────────────────────────────────────────
+async function toggleSubscription(clientId, templateId) {
+  const key = subKey(clientId, templateId);
+  const existing = subscriptions[key];
+  const row = document.querySelector(`[data-row="${clientId}|${templateId}"]`);
+  if (row) row.classList.add('subscribing');
+
+  if (existing) {
+    // Eemalda — kustuta rida (lihtsam kui is_active=false, vältib soft-delete loogikat)
+    const { error } = await sb.from('client_task_subscriptions')
+      .delete()
+      .eq('client_id', clientId)
+      .eq('template_id', templateId);
+    if (error) {
+      showToast('Viga: ' + error.message, 'error');
+      if (row) row.classList.remove('subscribing');
+      return;
+    }
+    delete subscriptions[key];
+    showToast('Tellimus eemaldatud');
+  } else {
+    const { data, error } = await sb.from('client_task_subscriptions')
+      .insert({ client_id: clientId, template_id: templateId, is_active: true })
+      .select()
+      .single();
+    if (error) {
+      showToast('Viga: ' + error.message, 'error');
+      if (row) row.classList.remove('subscribing');
+      return;
+    }
+    subscriptions[key] = data;
+    showToast('Tellimus lisatud');
+  }
+
+  render();
+}
+
+function debounceSave(clientId, templateId, field, value) {
+  const key = `${clientId}|${templateId}|${field}`;
+  clearTimeout(saveTimers[key]);
+  saveTimers[key] = setTimeout(() => saveOverride(clientId, templateId, field, value), 600);
+}
+
+async function saveOverride(clientId, templateId, field, rawValue) {
+  const key = subKey(clientId, templateId);
+  const sub = subscriptions[key];
+  if (!sub) {
+    showToast('Lisa kõigepealt tellimus', 'error');
+    return;
+  }
+
+  let value;
+  if (field === 'custom_due_day') {
+    if (rawValue === '' || rawValue == null) {
+      value = null;
+    } else {
+      const n = parseInt(rawValue, 10);
+      if (isNaN(n) || n < 1 || n > 31) {
+        showToast('Päev peab olema 1–31', 'error');
+        return;
+      }
+      value = n;
+    }
+  } else if (field === 'custom_priority') {
+    value = rawValue || null;
+  } else {
+    return;
+  }
+
+  const { error } = await sb.from('client_task_subscriptions')
+    .update({ [field]: value })
+    .eq('client_id', clientId)
+    .eq('template_id', templateId);
+
+  if (error) {
+    showToast('Viga: ' + error.message, 'error');
+    return;
+  }
+  sub[field] = value;
+  showToast('Salvestatud');
+}
+
+// ── UI ──────────────────────────────────────────────────────────
+function bindUIEvents() {
+  document.getElementById('logout-btn').addEventListener('click', () => sb.auth.signOut());
+}
+
+init();
+</script>
+</body>
+</html>
