@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skoor Admin — Ülesanded</title>
+  <link rel="icon" type="image/png" href="../../Logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #111827;
+      --bg2:      #1f2937;
+      --bg3:      #374151;
+      --border:   rgba(255,255,255,0.08);
+      --text:     #f9fafb;
+      --text2:    #9ca3af;
+      --text3:    #6b7280;
+      --accent:   #10b981;
+      --pos:      #10b981;
+      --neg:      #ef4444;
+      --warn:     #f59e0b;
+      --info:     #818cf8;
+      --radius:   12px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { opacity: 0.8; }
+
+    /* ── Loading / access ── */
+    #loading-screen, #denied-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      text-align: center;
+    }
+    #denied-screen h2 { color: var(--neg); margin-bottom: 12px; }
+    #denied-screen p { color: var(--text2); margin-bottom: 24px; }
+
+    /* ── Header ── */
+    #app { display: none; flex-direction: column; min-height: 100vh; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-logo { width: 36px; height: 36px; border-radius: 50%; }
+    .header-title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
+    .header-title .badge {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-left: 8px;
+      vertical-align: middle;
+      letter-spacing: 1px;
+    }
+    .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    .nav-link {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text2);
+      font-size: 13px;
+    }
+    .nav-link:hover { color: var(--text); border-color: var(--text2); opacity: 1; }
+    .nav-link.active { color: var(--text); border-color: var(--accent); background: rgba(16,185,129,0.08); }
+
+    /* ── Buttons ── */
+    button {
+      cursor: pointer;
+      font-family: inherit;
+      border: none;
+      border-radius: 8px;
+      transition: opacity 0.2s, background 0.2s, transform 0.1s;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 18px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+    .btn-secondary {
+      background: var(--bg3);
+      color: var(--text);
+      padding: 8px 14px;
+      font-size: 13px;
+    }
+    .btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+    .btn-danger {
+      background: var(--neg);
+      color: #fff;
+      padding: 10px 18px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .btn-danger:hover:not(:disabled) { opacity: 0.9; }
+    .btn-icon {
+      background: transparent;
+      color: var(--text2);
+      padding: 4px 8px;
+      font-size: 14px;
+    }
+    .btn-icon:hover { color: var(--text); }
+    .btn-icon.danger:hover { color: var(--neg); }
+
+    select, input[type="text"], input[type="email"], input[type="number"],
+    input[type="datetime-local"], input[type="month"], input[type="date"], textarea {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color 0.2s;
+      width: 100%;
+    }
+    select:focus, input:focus, textarea:focus { border-color: var(--accent); }
+    label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    main { padding: 24px; max-width: 1200px; margin: 0 auto; width: 100%; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .card h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text2);
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    /* ── Period bar ── */
+    .period-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .period-bar label { margin: 0; }
+    .period-bar input[type="month"] { width: auto; }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .toolbar .spacer { flex: 1; }
+
+    /* ── Stats ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .stat-tile {
+      background: var(--bg3);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .stat-tile .label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; }
+    .stat-tile .value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .stat-tile.todo    .value { color: var(--info); }
+    .stat-tile.overdue .value { color: var(--neg); }
+    .stat-tile.blocked .value { color: var(--warn); }
+    .stat-tile.done    .value { color: var(--accent); }
+
+    /* ── Filters ── */
+    .filters { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .filters select { width: auto; min-width: 160px; }
+
+    /* ── Table ── */
+    .tasks-scroll { overflow-x: auto; }
+    .tasks-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 880px; }
+    .tasks-table th { text-align: left; color: var(--text3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; padding: 0 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .tasks-table td { padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: top; }
+    .tasks-table tr.done td { opacity: 0.55; }
+    .tasks-table tr.overdue td.col-due { color: var(--neg); font-weight: 600; }
+    .tasks-table .col-due { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .tasks-table .col-actions { white-space: nowrap; text-align: right; }
+    .tasks-table .col-name strong { font-weight: 600; }
+    .tasks-table .col-name .desc { display: block; font-size: 12px; color: var(--text3); margin-top: 2px; }
+    .tasks-table .col-check { width: 36px; text-align: center; }
+    .tasks-table tr.row-clickable { cursor: pointer; }
+    .tasks-table tr.row-clickable:hover td { background: rgba(255,255,255,0.02); }
+
+    .check-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border: 1.5px solid var(--text3);
+      border-radius: 5px;
+      background: transparent;
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1;
+      padding: 0;
+    }
+    .check-btn:hover { border-color: var(--accent); }
+    .check-btn.checked { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .pill.priority-high   { background: rgba(239,68,68,0.15);  color: var(--neg); }
+    .pill.priority-medium { background: rgba(245,158,11,0.15); color: var(--warn); }
+    .pill.priority-low    { background: rgba(156,163,175,0.15); color: var(--text2); }
+    .pill.status-todo     { background: rgba(129,140,248,0.15); color: var(--info); }
+    .pill.status-blocked  { background: rgba(245,158,11,0.18); color: var(--warn); }
+    .pill.status-done     { background: rgba(16,185,129,0.15); color: var(--accent); }
+    .pill.template        { background: rgba(255,255,255,0.05); color: var(--text2); border: 1px solid var(--border); }
+    .pill.adhoc           { background: rgba(99,102,241,0.12); color: var(--info); border: 1px solid rgba(99,102,241,0.3); }
+
+    .empty-msg {
+      text-align: center;
+      color: var(--text2);
+      padding: 60px 20px;
+    }
+    .empty-msg .hint { font-size: 13px; color: var(--text3); margin-top: 8px; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      width: 100%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal h3 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+    .modal .modal-sub { font-size: 12px; color: var(--text2); margin-bottom: 18px; }
+    .modal .field { margin-bottom: 14px; }
+    .modal .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    .modal-actions.with-delete .btn-danger { margin-right: auto; }
+    .modal-error { color: var(--neg); font-size: 13px; margin-top: 8px; }
+    .modal-info  { color: var(--text2); font-size: 12px; margin-top: 8px; }
+
+    /* ── Mobile ── */
+    @media (max-width: 640px) {
+      header { padding: 12px 16px; }
+      main { padding: 16px; }
+      .modal .field-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ LOADING ═══════════════════════════ -->
+<div id="loading-screen" style="display:flex">
+  <p style="color: var(--text2)">Laen...</p>
+</div>
+
+<!-- ═══════════════════════════ DENIED ════════════════════════════ -->
+<div id="denied-screen">
+  <h2>Ligipääs keelatud</h2>
+  <p>Sul pole admin õigusi.</p>
+  <a href="../" class="nav-link">← Skoor avalehele</a>
+</div>
+
+<!-- ═══════════════════════════ APP ═══════════════════════════════ -->
+<div id="app">
+  <header>
+    <a href="../" class="header-left" style="color:inherit">
+      <img src="../../Logo.png" alt="LessGo" class="header-logo">
+      <span class="header-title">Skoor<span class="badge">ADMIN</span></span>
+    </a>
+    <div class="header-right">
+      <a href="timer.html" class="nav-link">Tööaeg</a>
+      <a href="tasks.html" class="nav-link active">Ülesanded</a>
+      <a href="../" class="nav-link">← Klientide vaade</a>
+      <button class="btn-secondary" id="logout-btn">Logi välja</button>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- Period selector -->
+    <div class="period-bar">
+      <label>Periood:</label>
+      <input type="month" id="period-input">
+      <button class="btn-secondary" id="prev-period-btn">‹ Eelmine</button>
+      <button class="btn-secondary" id="next-period-btn">Järgmine ›</button>
+      <button class="btn-secondary" id="this-period-btn">Käesolev kuu</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-tile todo"><div class="label">Tegemata</div><div class="value" id="stat-todo">—</div></div>
+      <div class="stat-tile overdue"><div class="label">Üle tähtaja</div><div class="value" id="stat-overdue">—</div></div>
+      <div class="stat-tile blocked"><div class="label">Blokeeritud</div><div class="value" id="stat-blocked">—</div></div>
+      <div class="stat-tile done"><div class="label">Tehtud</div><div class="value" id="stat-done">—</div></div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <button class="btn-primary" id="new-adhoc-btn">+ Lisa ad-hoc</button>
+      <button class="btn-secondary" id="generate-btn" title="Loo selle kuu instantsid kõikidest aktiivsetest mallide-tellimustest">⚡ Genereeri instantsid</button>
+      <div class="spacer"></div>
+      <span class="modal-info" id="period-info">—</span>
+    </div>
+
+    <!-- Filters -->
+    <div class="card">
+      <div class="filters">
+        <select id="filter-client"><option value="">Kõik kliendid</option></select>
+        <select id="filter-status">
+          <option value="">Kõik staatused</option>
+          <option value="todo">Tegemata</option>
+          <option value="blocked">Blokeeritud</option>
+          <option value="done">Tehtud</option>
+        </select>
+        <select id="filter-priority">
+          <option value="">Kõik prioriteedid</option>
+          <option value="high">Kõrge</option>
+          <option value="medium">Keskmine</option>
+          <option value="low">Madal</option>
+        </select>
+      </div>
+      <div class="tasks-scroll">
+        <table class="tasks-table" id="tasks-table">
+          <thead>
+            <tr>
+              <th class="col-check"></th>
+              <th>Tähtaeg</th>
+              <th>Klient</th>
+              <th>Ülesanne</th>
+              <th>Prioriteet</th>
+              <th>Staatus</th>
+              <th>Tehtud</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══════════════════════════ MODALS ═══════════════════════════ -->
+
+<!-- Edit / new task modal -->
+<div class="modal-overlay" id="task-modal">
+  <div class="modal">
+    <h3 id="task-modal-title">Lisa ad-hoc ülesanne</h3>
+    <p class="modal-sub" id="task-modal-sub">&nbsp;</p>
+    <input type="hidden" id="task-id">
+    <input type="hidden" id="task-template-id">
+
+    <div class="field">
+      <label for="task-client">Klient *</label>
+      <select id="task-client"><option value="">— Vali —</option></select>
+    </div>
+    <div class="field">
+      <label for="task-name">Nimi *</label>
+      <input type="text" id="task-name" placeholder="nt 'Aastaaruanne 2025'">
+    </div>
+    <div class="field">
+      <label for="task-description">Kirjeldus</label>
+      <textarea id="task-description" rows="2"></textarea>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="task-period">Periood *</label>
+        <input type="month" id="task-period">
+      </div>
+      <div class="field">
+        <label for="task-due">Tähtaeg *</label>
+        <input type="date" id="task-due">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="task-priority">Prioriteet *</label>
+        <select id="task-priority">
+          <option value="high">Kõrge</option>
+          <option value="medium" selected>Keskmine</option>
+          <option value="low">Madal</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="task-status">Staatus *</label>
+        <select id="task-status">
+          <option value="todo">Tegemata</option>
+          <option value="blocked">Blokeeritud</option>
+          <option value="done">Tehtud</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="task-notes">Märkus</label>
+      <textarea id="task-notes" rows="2" placeholder="nt 'Ootame Eve sissetulekuid'"></textarea>
+    </div>
+    <p class="modal-error" id="task-modal-error"></p>
+    <div class="modal-actions with-delete">
+      <button class="btn-danger" id="task-delete-btn" style="display:none">🗑 Kustuta</button>
+      <button class="btn-secondary" data-dismiss="task-modal">Tühista</button>
+      <button class="btn-primary" id="task-save-btn">Salvesta</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL  = 'https://lpehwgpitfowhyiaxrhe.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWh3Z3BpdGZvd2h5aWF4cmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzE3NDIsImV4cCI6MjA5MjYwNzc0Mn0.VRAFWMrlyigtPlDVAk9KG2NiFLd1l5aRxwmNrariUfI';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ── Globals ─────────────────────────────────────────────────────
+let currentUser = null;
+let isAdmin = false;
+let clients = [];
+let admins = [];
+let tasks = [];
+let currentPeriod = todayPeriod();
+
+// ── Helpers ─────────────────────────────────────────────────────
+function todayPeriod() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function todayDate() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function shiftPeriod(period, delta) {
+  const [y, m] = period.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function defaultDueDate(period) {
+  // Vaikimisi: järgmise kuu 10. (TSD-tüüpi)
+  const [y, m] = period.split('-').map(Number);
+  const next = new Date(y, m, 10);
+  return `${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`;
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso + 'T00:00:00');
+  return new Intl.DateTimeFormat('et-EE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return new Intl.DateTimeFormat('et-EE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
+}
+
+function priorityLabel(p) {
+  return { high: 'Kõrge', medium: 'Keskmine', low: 'Madal' }[p] || p;
+}
+
+function statusLabel(s) {
+  return { todo: 'Tegemata', blocked: 'Blokeeritud', done: 'Tehtud' }[s] || s;
+}
+
+function adminName(userId) {
+  if (!userId) return '—';
+  const a = admins.find(x => x.user_id === userId);
+  return a?.email?.split('@')[0] || userId.slice(0, 8);
+}
+
+function clientName(id) {
+  const c = clients.find(x => x.id === id);
+  return c?.name || '?';
+}
+
+function isOverdue(t) {
+  if (t.status === 'done') return false;
+  return t.due_date < todayDate();
+}
+
+function showError(elementId, msg) {
+  const el = document.getElementById(elementId);
+  el.textContent = msg || '';
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ── Init ────────────────────────────────────────────────────────
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    window.location.href = '../';
+    return;
+  }
+  currentUser = session.user;
+
+  const { data: adminRow } = await sb.from('admins').select('user_id').eq('user_id', currentUser.id).maybeSingle();
+  isAdmin = !!adminRow;
+
+  if (!isAdmin) {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('denied-screen').style.display = 'flex';
+    return;
+  }
+
+  await loadAdmins();
+  await loadClients();
+  await loadTasks();
+  populateClientDropdowns();
+
+  document.getElementById('period-input').value = currentPeriod;
+
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  bindUIEvents();
+
+  sb.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT') window.location.href = '../';
+  });
+}
+
+async function loadAdmins() {
+  const { data } = await sb.from('admins').select('user_id');
+  admins = (data || []).map(a => ({
+    user_id: a.user_id,
+    email: a.user_id === currentUser.id ? currentUser.email : a.user_id.slice(0, 8)
+  }));
+}
+
+async function loadClients() {
+  const { data, error } = await sb.from('clients').select('id, name').order('name');
+  if (error) { console.error('clients load:', error); return; }
+  clients = data || [];
+}
+
+async function loadTasks() {
+  const { data, error } = await sb.from('task_instances')
+    .select('*')
+    .eq('period', currentPeriod);
+  if (error) { console.error('tasks load:', error); tasks = []; render(); return; }
+  tasks = data || [];
+  render();
+}
+
+function populateClientDropdowns() {
+  const opts = clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  ['task-client', 'filter-client'].forEach(id => {
+    const sel = document.getElementById(id);
+    const placeholder = (id === 'filter-client') ? '<option value="">Kõik kliendid</option>' : '<option value="">— Vali —</option>';
+    sel.innerHTML = placeholder + opts;
+  });
+}
+
+// ── Render ──────────────────────────────────────────────────────
+function render() {
+  renderStats();
+  renderTable();
+  renderPeriodInfo();
+}
+
+function renderPeriodInfo() {
+  const total = tasks.length;
+  const elapsed = tasks.filter(t => t.completed_at).length;
+  document.getElementById('period-info').textContent =
+    total === 0 ? '' : `${elapsed} / ${total} tehtud`;
+}
+
+function renderStats() {
+  const todo    = tasks.filter(t => t.status === 'todo').length;
+  const blocked = tasks.filter(t => t.status === 'blocked').length;
+  const done    = tasks.filter(t => t.status === 'done').length;
+  const overdue = tasks.filter(isOverdue).length;
+  document.getElementById('stat-todo').textContent    = todo;
+  document.getElementById('stat-blocked').textContent = blocked;
+  document.getElementById('stat-done').textContent    = done;
+  document.getElementById('stat-overdue').textContent = overdue;
+}
+
+function renderTable() {
+  const fClient   = document.getElementById('filter-client').value;
+  const fStatus   = document.getElementById('filter-status').value;
+  const fPriority = document.getElementById('filter-priority').value;
+
+  const priorityOrder = { high: 0, medium: 1, low: 2 };
+  const statusOrder   = { todo: 0, blocked: 1, done: 2 };
+
+  let filtered = tasks.slice();
+  if (fClient)   filtered = filtered.filter(t => t.client_id === fClient);
+  if (fStatus)   filtered = filtered.filter(t => t.status === fStatus);
+  if (fPriority) filtered = filtered.filter(t => t.priority === fPriority);
+
+  filtered.sort((a, b) => {
+    if (statusOrder[a.status] !== statusOrder[b.status]) return statusOrder[a.status] - statusOrder[b.status];
+    if (priorityOrder[a.priority] !== priorityOrder[b.priority]) return priorityOrder[a.priority] - priorityOrder[b.priority];
+    if (a.due_date !== b.due_date) return a.due_date.localeCompare(b.due_date);
+    return clientName(a.client_id).localeCompare(clientName(b.client_id));
+  });
+
+  const tbody = document.querySelector('#tasks-table tbody');
+  if (filtered.length === 0) {
+    const empty = tasks.length === 0
+      ? `<tr><td colspan="8"><div class="empty-msg">
+           Selles kuus pole veel ülesandeid.
+           <div class="hint">Lisa ad-hoc või käivita "⚡ Genereeri instantsid" (kui kliendid on mallidega seotud).</div>
+         </div></td></tr>`
+      : `<tr><td colspan="8"><div class="empty-msg">Filtrile ei vasta ükski ülesanne.</div></td></tr>`;
+    tbody.innerHTML = empty;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(t => {
+    const overdue = isOverdue(t);
+    const isDone = t.status === 'done';
+    const isAdHoc = !t.template_id;
+    const completedTxt = t.completed_at
+      ? `${fmtDateTime(t.completed_at)}<br><small style="color:var(--text3)">${escapeHtml(adminName(t.completed_by))}</small>`
+      : '—';
+
+    return `
+      <tr class="${isDone ? 'done' : ''} ${overdue ? 'overdue' : ''} row-clickable" data-id="${t.id}">
+        <td class="col-check">
+          <button class="check-btn ${isDone ? 'checked' : ''}" data-toggle="${t.id}" title="${isDone ? 'Märgi tegemata' : 'Märgi tehtud'}">
+            ${isDone ? '✓' : ''}
+          </button>
+        </td>
+        <td class="col-due">${fmtDate(t.due_date)}</td>
+        <td>${escapeHtml(clientName(t.client_id))}</td>
+        <td class="col-name">
+          <strong>${escapeHtml(t.name)}</strong>
+          ${t.description ? `<span class="desc">${escapeHtml(t.description)}</span>` : ''}
+          ${t.notes ? `<span class="desc" style="color:var(--warn)">📌 ${escapeHtml(t.notes)}</span>` : ''}
+          ${isAdHoc ? '<span class="pill adhoc" style="margin-top:4px">ad-hoc</span>' : ''}
+        </td>
+        <td><span class="pill priority-${t.priority}">${priorityLabel(t.priority)}</span></td>
+        <td><span class="pill status-${t.status}">${statusLabel(t.status)}</span></td>
+        <td>${completedTxt}</td>
+        <td class="col-actions">
+          <button class="btn-icon" data-edit="${t.id}" title="Muuda">✏</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  // Bind row + check + edit clicks
+  tbody.querySelectorAll('[data-toggle]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleDone(btn.dataset.toggle);
+    });
+  });
+  tbody.querySelectorAll('[data-edit]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditModal(btn.dataset.edit);
+    });
+  });
+  tbody.querySelectorAll('tr.row-clickable').forEach(row => {
+    row.addEventListener('click', () => openEditModal(row.dataset.id));
+  });
+}
+
+// ── Toggle done ─────────────────────────────────────────────────
+async function toggleDone(taskId) {
+  const t = tasks.find(x => x.id === taskId);
+  if (!t) return;
+
+  const newStatus = t.status === 'done' ? 'todo' : 'done';
+  const update = {
+    status: newStatus,
+    completed_at: newStatus === 'done' ? new Date().toISOString() : null,
+    completed_by: newStatus === 'done' ? currentUser.id : null,
+    edited_at: new Date().toISOString(),
+    edited_by: currentUser.id
+  };
+
+  const { error } = await sb.from('task_instances').update(update).eq('id', taskId);
+  if (error) { alert('Viga: ' + error.message); return; }
+  await loadTasks();
+}
+
+// ── New / Edit modal ────────────────────────────────────────────
+function openNewModal() {
+  document.getElementById('task-modal-title').textContent = 'Lisa ad-hoc ülesanne';
+  document.getElementById('task-modal-sub').textContent = '';
+  document.getElementById('task-id').value = '';
+  document.getElementById('task-template-id').value = '';
+  document.getElementById('task-client').value = '';
+  document.getElementById('task-name').value = '';
+  document.getElementById('task-description').value = '';
+  document.getElementById('task-period').value = currentPeriod;
+  document.getElementById('task-due').value = defaultDueDate(currentPeriod);
+  document.getElementById('task-priority').value = 'medium';
+  document.getElementById('task-status').value = 'todo';
+  document.getElementById('task-notes').value = '';
+  document.getElementById('task-delete-btn').style.display = 'none';
+  showError('task-modal-error', '');
+  showModal('task-modal');
+}
+
+function openEditModal(taskId) {
+  const t = tasks.find(x => x.id === taskId);
+  if (!t) return;
+
+  const isTemplate = !!t.template_id;
+  document.getElementById('task-modal-title').textContent = 'Muuda ülesannet';
+  document.getElementById('task-modal-sub').textContent = isTemplate
+    ? 'Mallist genereeritud ülesanne — kustutamine kustutab ainult selle kuu instantsi.'
+    : 'Ad-hoc ülesanne.';
+  document.getElementById('task-id').value = t.id;
+  document.getElementById('task-template-id').value = t.template_id || '';
+  document.getElementById('task-client').value = t.client_id;
+  document.getElementById('task-name').value = t.name;
+  document.getElementById('task-description').value = t.description || '';
+  document.getElementById('task-period').value = t.period;
+  document.getElementById('task-due').value = t.due_date;
+  document.getElementById('task-priority').value = t.priority;
+  document.getElementById('task-status').value = t.status;
+  document.getElementById('task-notes').value = t.notes || '';
+  document.getElementById('task-delete-btn').style.display = '';
+  showError('task-modal-error', '');
+  showModal('task-modal');
+}
+
+async function saveTask() {
+  const id          = document.getElementById('task-id').value;
+  const templateId  = document.getElementById('task-template-id').value || null;
+  const clientId    = document.getElementById('task-client').value;
+  const name        = document.getElementById('task-name').value.trim();
+  const description = document.getElementById('task-description').value.trim() || null;
+  const period      = document.getElementById('task-period').value;
+  const dueDate     = document.getElementById('task-due').value;
+  const priority    = document.getElementById('task-priority').value;
+  const status      = document.getElementById('task-status').value;
+  const notes       = document.getElementById('task-notes').value.trim() || null;
+
+  if (!clientId)             return showError('task-modal-error', 'Vali klient.');
+  if (!name)                 return showError('task-modal-error', 'Sisesta ülesande nimi.');
+  if (!period)               return showError('task-modal-error', 'Sisesta periood.');
+  if (!dueDate)              return showError('task-modal-error', 'Sisesta tähtaeg.');
+  if (!/^\d{4}-\d{2}$/.test(period)) return showError('task-modal-error', 'Vigane periood.');
+
+  const btn = document.getElementById('task-save-btn');
+  btn.disabled = true;
+
+  // Existing task: capture status change for completed_at/_by
+  let prevStatus = null;
+  if (id) {
+    const prev = tasks.find(x => x.id === id);
+    prevStatus = prev?.status;
+  }
+
+  const payload = {
+    client_id: clientId,
+    name: name,
+    description: description,
+    period: period,
+    due_date: dueDate,
+    priority: priority,
+    status: status,
+    notes: notes,
+    edited_at: new Date().toISOString(),
+    edited_by: currentUser.id
+  };
+
+  // Status change → done: stamp; → not done: clear
+  if (status === 'done' && prevStatus !== 'done') {
+    payload.completed_at = new Date().toISOString();
+    payload.completed_by = currentUser.id;
+  } else if (status !== 'done' && prevStatus === 'done') {
+    payload.completed_at = null;
+    payload.completed_by = null;
+  }
+
+  let error;
+  if (id) {
+    ({ error } = await sb.from('task_instances').update(payload).eq('id', id));
+  } else {
+    payload.template_id = templateId;
+    payload.created_by  = currentUser.id;
+    if (status === 'done') {
+      payload.completed_at = new Date().toISOString();
+      payload.completed_by = currentUser.id;
+    }
+    ({ error } = await sb.from('task_instances').insert(payload));
+  }
+
+  btn.disabled = false;
+  if (error) return showError('task-modal-error', 'Viga: ' + error.message);
+
+  hideModal('task-modal');
+  await loadTasks();
+}
+
+async function deleteTask() {
+  const id = document.getElementById('task-id').value;
+  if (!id) return;
+  if (!confirm('Kustuta see ülesanne lõplikult?')) return;
+  const { error } = await sb.from('task_instances').delete().eq('id', id);
+  if (error) return showError('task-modal-error', 'Viga: ' + error.message);
+  hideModal('task-modal');
+  await loadTasks();
+}
+
+// ── Generate instances ──────────────────────────────────────────
+async function generateInstances() {
+  const btn = document.getElementById('generate-btn');
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = '⏳ Genereerin...';
+
+  const { data, error } = await sb.rpc('generate_task_instances_for_period', { p_period: currentPeriod });
+
+  btn.disabled = false;
+  btn.textContent = orig;
+
+  if (error) {
+    alert('Viga genereerimisel: ' + error.message);
+    return;
+  }
+  const result = Array.isArray(data) ? data[0] : data;
+  const created = result?.created ?? 0;
+  const skipped = result?.skipped ?? 0;
+  alert(`Genereeritud ${created} ülesannet (${skipped} vahele jäetud — juba olemas või mall mitte-monthly).`);
+  await loadTasks();
+}
+
+// ── Modals ──────────────────────────────────────────────────────
+function showModal(id) { document.getElementById(id).classList.add('visible'); }
+function hideModal(id) { document.getElementById(id).classList.remove('visible'); }
+
+// ── UI events ───────────────────────────────────────────────────
+function bindUIEvents() {
+  document.getElementById('logout-btn').addEventListener('click', () => sb.auth.signOut());
+
+  document.getElementById('new-adhoc-btn').addEventListener('click', openNewModal);
+  document.getElementById('generate-btn').addEventListener('click', generateInstances);
+
+  document.getElementById('task-save-btn').addEventListener('click', saveTask);
+  document.getElementById('task-delete-btn').addEventListener('click', deleteTask);
+
+  // Modal close
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.classList.remove('visible');
+    });
+  });
+  document.querySelectorAll('[data-dismiss]').forEach(btn => {
+    btn.addEventListener('click', () => hideModal(btn.dataset.dismiss));
+  });
+
+  // Period nav
+  document.getElementById('period-input').addEventListener('change', async (e) => {
+    currentPeriod = e.target.value;
+    await loadTasks();
+  });
+  document.getElementById('prev-period-btn').addEventListener('click', async () => {
+    currentPeriod = shiftPeriod(currentPeriod, -1);
+    document.getElementById('period-input').value = currentPeriod;
+    await loadTasks();
+  });
+  document.getElementById('next-period-btn').addEventListener('click', async () => {
+    currentPeriod = shiftPeriod(currentPeriod, +1);
+    document.getElementById('period-input').value = currentPeriod;
+    await loadTasks();
+  });
+  document.getElementById('this-period-btn').addEventListener('click', async () => {
+    currentPeriod = todayPeriod();
+    document.getElementById('period-input').value = currentPeriod;
+    await loadTasks();
+  });
+
+  // Filters
+  ['filter-client', 'filter-status', 'filter-priority'].forEach(id => {
+    document.getElementById(id).addEventListener('change', renderTable);
+  });
+}
+
+// ── Start ───────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

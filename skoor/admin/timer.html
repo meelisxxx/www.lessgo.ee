@@ -90,6 +90,7 @@
       font-size: 13px;
     }
     .nav-link:hover { color: var(--text); border-color: var(--text2); opacity: 1; }
+    .nav-link.active { color: var(--text); border-color: var(--accent); background: rgba(16,185,129,0.08); }
 
     /* ── Buttons ── */
     button {
@@ -341,6 +342,8 @@
       <span class="header-title">Skoor<span class="badge">ADMIN</span></span>
     </a>
     <div class="header-right">
+      <a href="timer.html" class="nav-link active">Tööaeg</a>
+      <a href="tasks.html" class="nav-link">Ülesanded</a>
       <a href="../" class="nav-link">← Klientide vaade</a>
       <button class="btn-secondary" id="logout-btn">Logi välja</button>
     </div>
