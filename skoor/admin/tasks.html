@@ -434,7 +434,7 @@
       </div>
       <div class="field">
         <label for="task-due">Tähtaeg *</label>
-        <input type="date" id="task-due">
+        <input type="text" id="task-due" placeholder="pp/kk/aaaa" inputmode="numeric" maxlength="10">
       </div>
     </div>
     <div class="field-row">
@@ -504,6 +504,28 @@ function defaultDueDate(period) {
   const [y, m] = period.split('-').map(Number);
   const next = new Date(y, m, 10);
   return `${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`;
+}
+
+// DD/MM/YYYY (või DD.MM.YYYY, DD-MM-YYYY) → ISO yyyy-mm-dd, või null kui vigane
+function parseDDMMYYYY(s) {
+  const m = (s || '').trim().match(/^(\d{1,2})\s*[\/.\-]\s*(\d{1,2})\s*[\/.\-]\s*(\d{4})$/);
+  if (!m) return null;
+  const d = parseInt(m[1], 10);
+  const mo = parseInt(m[2], 10);
+  const y = parseInt(m[3], 10);
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  const iso = `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  // Reaalselt eksisteeriv kuupäev (nt 31.02 ei eksisteeri)
+  const dt = new Date(iso + 'T00:00:00');
+  if (isNaN(dt.getTime()) || dt.getDate() !== d || dt.getMonth()+1 !== mo || dt.getFullYear() !== y) return null;
+  return iso;
+}
+
+// ISO yyyy-mm-dd → DD/MM/YYYY
+function isoToDDMMYYYY(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
 }
 
 function fmtDate(iso) {
@@ -760,7 +782,7 @@ function openNewModal() {
   document.getElementById('task-name').value = '';
   document.getElementById('task-description').value = '';
   document.getElementById('task-period').value = currentPeriod;
-  document.getElementById('task-due').value = defaultDueDate(currentPeriod);
+  document.getElementById('task-due').value = isoToDDMMYYYY(defaultDueDate(currentPeriod));
   document.getElementById('task-priority').value = 'medium';
   document.getElementById('task-status').value = 'todo';
   document.getElementById('task-notes').value = '';
@@ -784,7 +806,7 @@ function openEditModal(taskId) {
   document.getElementById('task-name').value = t.name;
   document.getElementById('task-description').value = t.description || '';
   document.getElementById('task-period').value = t.period;
-  document.getElementById('task-due').value = t.due_date;
+  document.getElementById('task-due').value = isoToDDMMYYYY(t.due_date);
   document.getElementById('task-priority').value = t.priority;
   document.getElementById('task-status').value = t.status;
   document.getElementById('task-notes').value = t.notes || '';
@@ -800,7 +822,7 @@ async function saveTask() {
   const name        = document.getElementById('task-name').value.trim();
   const description = document.getElementById('task-description').value.trim() || null;
   const period      = document.getElementById('task-period').value;
-  const dueDate     = document.getElementById('task-due').value;
+  const dueRaw      = document.getElementById('task-due').value;
   const priority    = document.getElementById('task-priority').value;
   const status      = document.getElementById('task-status').value;
   const notes       = document.getElementById('task-notes').value.trim() || null;
@@ -808,8 +830,11 @@ async function saveTask() {
   if (!clientId)             return showError('task-modal-error', 'Vali klient.');
   if (!name)                 return showError('task-modal-error', 'Sisesta ülesande nimi.');
   if (!period)               return showError('task-modal-error', 'Sisesta periood.');
-  if (!dueDate)              return showError('task-modal-error', 'Sisesta tähtaeg.');
+  if (!dueRaw)               return showError('task-modal-error', 'Sisesta tähtaeg.');
   if (!/^\d{4}-\d{2}$/.test(period)) return showError('task-modal-error', 'Vigane periood.');
+
+  const dueDate = parseDDMMYYYY(dueRaw);
+  if (!dueDate) return showError('task-modal-error', 'Vigane tähtaeg. Formaat: pp/kk/aaaa (nt 10/06/2026).');
 
   const btn = document.getElementById('task-save-btn');
   btn.disabled = true;
