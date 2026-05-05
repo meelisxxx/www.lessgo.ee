@@ -508,14 +508,19 @@ function defaultDueDate(period) {
 
 function fmtDate(iso) {
   if (!iso) return '—';
-  const d = new Date(iso + 'T00:00:00');
-  return new Intl.DateTimeFormat('et-EE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
 }
 
 function fmtDateTime(iso) {
   if (!iso) return '—';
-  const d = new Date(iso);
-  return new Intl.DateTimeFormat('et-EE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
+  const dObj = new Date(iso);
+  const d  = String(dObj.getDate()).padStart(2, '0');
+  const m  = String(dObj.getMonth() + 1).padStart(2, '0');
+  const y  = dObj.getFullYear();
+  const hh = String(dObj.getHours()).padStart(2, '0');
+  const mm = String(dObj.getMinutes()).padStart(2, '0');
+  return `${d}/${m}/${y} ${hh}:${mm}`;
 }
 
 function priorityLabel(p) {
