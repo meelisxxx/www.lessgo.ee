@@ -8,6 +8,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/themes/dark.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/et.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -934,6 +938,14 @@ function bindUIEvents() {
 
   document.getElementById('task-save-btn').addEventListener('click', saveTask);
   document.getElementById('task-delete-btn').addEventListener('click', deleteTask);
+
+  // Flatpickr: kalender popup tähtaja inputil (DD/MM/YYYY, Eesti locale)
+  flatpickr('#task-due', {
+    locale: 'et',
+    dateFormat: 'd/m/Y',
+    allowInput: true,
+    disableMobile: true
+  });
 
   // Modal close
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
