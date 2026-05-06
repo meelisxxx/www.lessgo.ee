@@ -309,6 +309,59 @@
     }
     .btn-doc-clear:hover:not(:disabled) { color: var(--text); border-color: var(--text2); }
 
+    /* ── Merit section ── */
+    .merit-section {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .merit-section .merit-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .merit-section .merit-title {
+      font-size: 12px;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 600;
+    }
+    .merit-section .merit-status {
+      font-size: 12px;
+      margin-left: auto;
+      font-variant-numeric: tabular-nums;
+    }
+    .merit-section .merit-status.ready { color: var(--accent); }
+    .merit-section .merit-status.miss  { color: var(--warn); }
+    .merit-section .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .merit-section .merit-grid.full { grid-template-columns: 1fr; }
+    .merit-section input[type="text"] {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 12px;
+      padding: 7px 9px;
+      outline: none;
+      width: 100%;
+      transition: border-color 0.2s;
+    }
+    .merit-section input[type="text"]:focus { border-color: var(--accent); }
+    .merit-section .field-label {
+      font-size: 10px;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 3px;
+    }
+
     /* ── Toast ── */
     .toast {
       position: fixed;
@@ -360,6 +413,7 @@
       <a href="index.html" class="nav-link">Status</a>
       <a href="timer.html" class="nav-link">Tööaeg</a>
       <a href="tasks.html" class="nav-link">Ülesanded</a>
+      <a href="reports.html" class="nav-link">Arved</a>
       <a href="clients.html" class="nav-link active">Kliendid</a>
       <a href="templates.html" class="nav-link">Mallid</a>
       <a href="../" class="nav-link">← Klientide vaade</a>
@@ -452,7 +506,9 @@ async function init() {
 }
 
 async function loadClients() {
-  const { data, error } = await sb.from('clients').select('id, name').order('name');
+  const { data, error } = await sb.from('clients')
+    .select('id, name, merit_evemee_customer_id, merit_evemee_reg_no, merit_evemee_country_code')
+    .order('name');
   if (error) { console.error('clients:', error); return; }
   clients = data || [];
 }
@@ -530,6 +586,42 @@ function render() {
   grid.querySelectorAll('[data-doc-clear]').forEach(el => {
     el.addEventListener('click', () => clearDocs(el.dataset.client));
   });
+  grid.querySelectorAll('[data-merit-field]').forEach(el => {
+    el.addEventListener('input', () => debounceSaveMerit(el.dataset.client, el.dataset.meritField, el.value));
+  });
+}
+
+function debounceSaveMerit(clientId, field, value) {
+  const key = `merit|${clientId}|${field}`;
+  clearTimeout(saveTimers[key]);
+  saveTimers[key] = setTimeout(() => saveMeritField(clientId, field, value), 600);
+}
+
+async function saveMeritField(clientId, field, rawValue) {
+  const allowed = ['merit_evemee_customer_id','merit_evemee_reg_no','merit_evemee_country_code'];
+  if (!allowed.includes(field)) return;
+
+  let value = (rawValue || '').trim() || null;
+  if (field === 'merit_evemee_country_code' && value) value = value.toUpperCase();
+
+  const { error } = await sb.from('clients')
+    .update({ [field]: value })
+    .eq('id', clientId);
+
+  if (error) { showToast('Viga: ' + error.message, 'error'); return; }
+
+  const c = clients.find(c => c.id === clientId);
+  if (c) c[field] = value;
+
+  // Värskenda ainult sidumise staatuse pillit (ära tee re-render't, et input fookus säiliks)
+  const card = document.querySelector(`[data-merit-field][data-client="${clientId}"]`)?.closest('.client-card');
+  const statusEl = card?.querySelector('.merit-status');
+  if (statusEl && c) {
+    const ready = c.merit_evemee_customer_id || c.merit_evemee_reg_no;
+    statusEl.className = 'merit-status ' + (ready ? 'ready' : 'miss');
+    statusEl.textContent = ready ? '✓ valmis' : '⚠ sidumata';
+  }
+  showToast('Salvestatud');
 }
 
 function renderClientCard(client) {
@@ -554,7 +646,50 @@ function renderClientCard(client) {
       <div class="templates-list">
         ${rows || '<div class="empty-msg">Mallid puuduvad.</div>'}
       </div>
+      ${renderMeritSection(client)}
       ${renderDocSection(client)}
+    </div>
+  `;
+}
+
+function renderMeritSection(client) {
+  const hasId    = !!client.merit_evemee_customer_id;
+  const hasRegNo = !!client.merit_evemee_reg_no;
+  const ready    = hasId || hasRegNo;
+  const statusHtml = ready
+    ? '<span class="merit-status ready">✓ valmis</span>'
+    : '<span class="merit-status miss">⚠ sidumata</span>';
+
+  return `
+    <div class="merit-section">
+      <div class="merit-header">
+        <span>🧾</span>
+        <span class="merit-title">Merit (Evemee) sidumine</span>
+        ${statusHtml}
+      </div>
+      <div class="merit-grid">
+        <div>
+          <div class="field-label">Customer ID (GUID)</div>
+          <input type="text" data-merit-field="merit_evemee_customer_id" data-client="${client.id}"
+                 value="${escapeHtml(client.merit_evemee_customer_id || '')}"
+                 placeholder="nt 1a2b3c4d-...">
+        </div>
+        <div>
+          <div class="field-label">Registrikood</div>
+          <input type="text" data-merit-field="merit_evemee_reg_no" data-client="${client.id}"
+                 value="${escapeHtml(client.merit_evemee_reg_no || '')}"
+                 placeholder="nt 16914274">
+        </div>
+      </div>
+      <div class="merit-grid full" style="margin-top:8px">
+        <div>
+          <div class="field-label">Riigi kood (2-tähemärk)</div>
+          <input type="text" data-merit-field="merit_evemee_country_code" data-client="${client.id}"
+                 value="${escapeHtml(client.merit_evemee_country_code || 'EE')}"
+                 maxlength="2" style="width:60px"
+                 placeholder="EE">
+        </div>
+      </div>
     </div>
   `;
 }

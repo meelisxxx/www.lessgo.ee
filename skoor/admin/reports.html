@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skoor Admin — Arved</title>
+  <link rel="icon" type="image/png" href="../../Logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #111827;
+      --bg2:      #1f2937;
+      --bg3:      #374151;
+      --border:   rgba(255,255,255,0.08);
+      --text:     #f9fafb;
+      --text2:    #9ca3af;
+      --text3:    #6b7280;
+      --accent:   #10b981;
+      --pos:      #10b981;
+      --neg:      #ef4444;
+      --warn:     #f59e0b;
+      --info:     #818cf8;
+      --radius:   12px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { opacity: 0.8; }
+
+    #loading-screen, #denied-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      text-align: center;
+    }
+    #denied-screen h2 { color: var(--neg); margin-bottom: 12px; }
+    #denied-screen p { color: var(--text2); margin-bottom: 24px; }
+
+    #app { display: none; flex-direction: column; min-height: 100vh; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-logo { width: 36px; height: 36px; border-radius: 50%; }
+    .header-title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
+    .header-title .badge {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-left: 8px;
+      vertical-align: middle;
+      letter-spacing: 1px;
+    }
+    .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    .nav-link {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text2);
+      font-size: 13px;
+    }
+    .nav-link:hover { color: var(--text); border-color: var(--text2); opacity: 1; }
+    .nav-link.active { color: var(--text); border-color: var(--accent); background: rgba(16,185,129,0.08); }
+
+    button {
+      cursor: pointer;
+      font-family: inherit;
+      border: none;
+      border-radius: 8px;
+      transition: opacity 0.2s, background 0.2s, transform 0.1s;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      padding: 8px 16px;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+    .btn-secondary {
+      background: var(--bg3);
+      color: var(--text);
+      padding: 8px 14px;
+      font-size: 13px;
+    }
+    .btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+    .btn-danger {
+      background: var(--neg);
+      color: #fff;
+      padding: 8px 14px;
+      font-size: 13px;
+    }
+    .btn-danger:hover:not(:disabled) { opacity: 0.9; }
+    .btn-warn {
+      background: var(--warn);
+      color: #1f2937;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .btn-warn:hover:not(:disabled) { opacity: 0.9; }
+
+    main {
+      flex: 1;
+      padding: 24px;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .page-intro {
+      color: var(--text2);
+      font-size: 13px;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .period-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .period-bar label { color: var(--text2); font-size: 13px; }
+    .period-bar input[type="month"] {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      padding: 6px 10px;
+      outline: none;
+    }
+
+    .invoices-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    .invoice-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+    }
+    .invoice-card.locked    { border-color: rgba(245,158,11,0.4); }
+    .invoice-card.exported  { border-color: rgba(16,185,129,0.4); }
+    .invoice-card.failed    { border-color: rgba(239,68,68,0.5); }
+    .invoice-card.skipped   { border-color: rgba(156,163,175,0.3); opacity: 0.85; }
+
+    .invoice-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .client-name { font-size: 16px; font-weight: 600; }
+    .client-meta {
+      color: var(--text3);
+      font-size: 12px;
+      margin-left: 8px;
+    }
+    .merit-warn { color: var(--warn); font-size: 12px; margin-left: 8px; }
+
+    .pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .pill.open      { background: var(--bg3);                 color: var(--text2); }
+    .pill.locked    { background: rgba(245,158,11,0.15);      color: var(--warn); }
+    .pill.exported  { background: rgba(16,185,129,0.15);      color: var(--accent); }
+    .pill.failed    { background: rgba(239,68,68,0.15);       color: var(--neg); }
+    .pill.skipped   { background: rgba(156,163,175,0.15);     color: var(--text2); }
+
+    .invoice-body {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 14px;
+      margin: 12px 0;
+    }
+    .stat .label  { color: var(--text2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .stat .value  { font-size: 16px; font-weight: 500; }
+    .stat .value.muted { color: var(--text3); font-style: italic; font-size: 13px; font-weight: 400; }
+    .stat .value.big   { font-size: 18px; color: var(--accent); font-weight: 600; }
+
+    .invoice-foot {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .merit-info {
+      background: var(--bg3);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--text2);
+      margin-top: 10px;
+    }
+    .merit-info strong { color: var(--text); font-weight: 600; }
+    .merit-info code   { font-family: 'SF Mono', Consolas, monospace; font-size: 11px; color: var(--info); }
+    .merit-info.error  { background: rgba(239,68,68,0.08); color: var(--neg); }
+    .merit-info.skip   { background: rgba(156,163,175,0.08); color: var(--text2); }
+
+    .empty-msg {
+      padding: 40px;
+      text-align: center;
+      color: var(--text2);
+      font-size: 14px;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 13px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+      z-index: 1000;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: transform 0.25s, opacity 0.25s;
+      max-width: 360px;
+    }
+    .toast.visible { transform: translateY(0); opacity: 1; }
+    .toast.success { border-color: rgba(16,185,129,0.4); }
+    .toast.error   { border-color: rgba(239,68,68,0.4); color: var(--neg); }
+
+    /* Confirm modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 16px;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      max-width: 480px;
+      width: 100%;
+    }
+    .modal h3 { margin-bottom: 12px; font-size: 16px; }
+    .modal p  { color: var(--text2); font-size: 13px; line-height: 1.5; margin-bottom: 14px; }
+    .modal .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+    @media (max-width: 640px) {
+      header { padding: 12px 16px; }
+      main { padding: 16px; }
+      .invoice-body { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading-screen" style="display:flex">
+  <p style="color: var(--text2)">Laen...</p>
+</div>
+
+<div id="denied-screen">
+  <h2>Ligipääs keelatud</h2>
+  <p>Sul pole admin õigusi.</p>
+  <a href="../" class="nav-link">← Skoor avalehele</a>
+</div>
+
+<div id="app">
+  <header>
+    <a href="../" class="header-left" style="color:inherit">
+      <img src="../../Logo.png" alt="LessGo" class="header-logo">
+      <span class="header-title">Skoor<span class="badge">ADMIN</span></span>
+    </a>
+    <div class="header-right">
+      <a href="index.html" class="nav-link">Status</a>
+      <a href="timer.html" class="nav-link">Tööaeg</a>
+      <a href="tasks.html" class="nav-link">Ülesanded</a>
+      <a href="reports.html" class="nav-link active">Arved</a>
+      <a href="clients.html" class="nav-link">Kliendid</a>
+      <a href="templates.html" class="nav-link">Mallid</a>
+      <a href="../" class="nav-link">← Klientide vaade</a>
+      <button class="btn-secondary" id="logout-btn">Logi välja</button>
+    </div>
+  </header>
+
+  <main>
+    <p class="page-intro">
+      Igakuised arved Evemee OÜ Meritisse. Lukusta kuu — siis salvestub snapshot tracked + adjustments + tunnihinnaga. Seejärel saada Meritisse: see loob arve mustandi (Eve kontrollib ja saadab kliendile käsitsi). Lukustatud kuus ei saa enam tööaega muuta. Eksporditud arvet ei saa avada.
+    </p>
+
+    <div class="period-bar">
+      <label>Periood:</label>
+      <input type="month" id="period-input">
+      <button class="btn-secondary" id="prev-period-btn">‹ Eelmine</button>
+      <button class="btn-secondary" id="next-period-btn">Järgmine ›</button>
+      <button class="btn-secondary" id="prev-month-btn">Eelmine kuu</button>
+    </div>
+
+    <div class="invoices-grid" id="invoices-grid"></div>
+  </main>
+</div>
+
+<!-- Confirm modal -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal">
+    <h3 id="confirm-title">Kinnita</h3>
+    <p id="confirm-text">—</p>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="confirm-cancel-btn">Tühista</button>
+      <button class="btn-primary" id="confirm-ok-btn">Jah</button>
+    </div>
+  </div>
+</div>
+
+<!-- Skip modal -->
+<div class="modal-overlay" id="skip-modal">
+  <div class="modal">
+    <h3 id="skip-title">Märgi: ei esita arvet</h3>
+    <p id="skip-text">Märgi, et selle kuu eest kliendile arvet ei esitata. Kuu jääb arvete loendis nähtavaks staatuses "ei esita".</p>
+    <div style="margin-bottom: 14px">
+      <label style="display:block; font-size:12px; color:var(--text2); margin-bottom:6px">Põhjus (valikuline)</label>
+      <textarea id="skip-reason" rows="2"
+                placeholder="nt 'Klient ei olnud aktiivne', 'Aastane arve detsembris'..."
+                style="background:var(--bg3); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:inherit; font-size:13px; padding:8px 10px; outline:none; width:100%; resize:vertical"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="skip-cancel-btn">Tühista</button>
+      <button class="btn-secondary" id="skip-confirm-btn">Märgi "ei esita"</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL  = 'https://lpehwgpitfowhyiaxrhe.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWh3Z3BpdGZvd2h5aWF4cmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzE3NDIsImV4cCI6MjA5MjYwNzc0Mn0.VRAFWMrlyigtPlDVAk9KG2NiFLd1l5aRxwmNrariUfI';
+
+// n8n webhook for Merit invoice creation (workflow 06_skoor_create_invoice.json)
+const INVOICE_WEBHOOK = 'https://n8n.lessgo.ee/webhook/skoor/create-invoice';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let currentUser = null;
+let isAdmin = false;
+let clients = [];                // [{id, name, slug, merit_evemee_customer_id, merit_evemee_reg_no, merit_evemee_country_code}]
+let rates = {};                  // client_id → rate row
+let entriesByClient = {};        // client_id → { tracked_minutes, adj_minutes }
+let invoicesByClient = {};       // client_id → monthly_invoice row
+let currentPeriod = lastPeriod();
+
+// ── Helpers ─────────────────────────────────────────────────────
+function todayPeriod() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function lastPeriod() {
+  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function shiftPeriod(period, delta) {
+  const [y, m] = period.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtEur(v) {
+  if (v == null) return '—';
+  return new Intl.NumberFormat('et-EE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v) + ' €';
+}
+function fmtHM(minutes) {
+  if (minutes == null) return '—';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h}h ${String(m).padStart(2,'0')}m`;
+}
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return new Intl.DateTimeFormat('et-EE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
+}
+function fmtPeriod(p) {
+  const [y, m] = p.split('-');
+  return `${m}.${y}`;
+}
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} visible`;
+  clearTimeout(showToast._h);
+  showToast._h = setTimeout(() => t.classList.remove('visible'), 3000);
+}
+function confirmAction(title, text, okLabel = 'Jah') {
+  return new Promise((resolve) => {
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-text').textContent = text;
+    document.getElementById('confirm-ok-btn').textContent = okLabel;
+    const overlay = document.getElementById('confirm-modal');
+    overlay.classList.add('visible');
+    const ok = () => { cleanup(); resolve(true); };
+    const cancel = () => { cleanup(); resolve(false); };
+    const cleanup = () => {
+      overlay.classList.remove('visible');
+      document.getElementById('confirm-ok-btn').removeEventListener('click', ok);
+      document.getElementById('confirm-cancel-btn').removeEventListener('click', cancel);
+    };
+    document.getElementById('confirm-ok-btn').addEventListener('click', ok);
+    document.getElementById('confirm-cancel-btn').addEventListener('click', cancel);
+  });
+}
+
+// ── Calculations ────────────────────────────────────────────────
+function calcOpen(clientId) {
+  // Lukuta rida — arvuta "kui palju oleks" (eelvaate jaoks)
+  const e = entriesByClient[clientId] || { tracked_minutes: 0, adj_minutes: 0 };
+  const r = rates[clientId];
+  const total_minutes = (e.tracked_minutes || 0) + (e.adj_minutes || 0);
+
+  if (!r) return { ...e, total_minutes, total_eur: null, vat_eur: null, total_with_vat: null, missing_rate: true };
+
+  let total_eur;
+  if (r.is_fixed_price) {
+    total_eur = r.fixed_price_eur || 0;
+  } else if (total_minutes === 0) {
+    total_eur = 0;
+  } else {
+    total_eur = Math.round((total_minutes / 60) * (r.rate_eur || 0) * 100) / 100;
+  }
+  const vat_eur = Math.round(total_eur * 0.24 * 100) / 100;
+  return { ...e, total_minutes, rate: r, total_eur, vat_eur, total_with_vat: total_eur + vat_eur, missing_rate: false };
+}
+
+// ── Init ────────────────────────────────────────────────────────
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    window.location.href = '../';
+    return;
+  }
+  currentUser = session.user;
+
+  const { data: adminRow } = await sb.from('admins').select('user_id').eq('user_id', currentUser.id).maybeSingle();
+  isAdmin = !!adminRow;
+  if (!isAdmin) {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('denied-screen').style.display = 'flex';
+    return;
+  }
+
+  await loadClients();
+  await loadRates();
+
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  document.getElementById('period-input').value = currentPeriod;
+  bindUIEvents();
+
+  await refresh();
+
+  sb.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT') window.location.href = '../';
+  });
+}
+
+async function loadClients() {
+  const { data, error } = await sb.from('clients')
+    .select('id, name, slug, merit_evemee_customer_id, merit_evemee_reg_no, merit_evemee_country_code')
+    .order('name');
+  if (error) { showToast('Kliente ei saanud laadida: ' + error.message, 'error'); return; }
+  clients = data || [];
+}
+
+async function loadRates() {
+  const { data, error } = await sb.from('hourly_rates').select('*');
+  if (error) { showToast('Hindu ei saanud laadida: ' + error.message, 'error'); return; }
+  rates = {};
+  (data || []).forEach(r => { rates[r.client_id] = r; });
+}
+
+async function loadInvoicesAndEntries() {
+  // Aktiivse perioodi monthly_invoices
+  const { data: invs, error: invErr } = await sb.from('monthly_invoices')
+    .select('*')
+    .eq('period', currentPeriod);
+  if (invErr) { showToast('Arveid ei saanud laadida: ' + invErr.message, 'error'); return; }
+  invoicesByClient = {};
+  (invs || []).forEach(i => { invoicesByClient[i.client_id] = i; });
+
+  // Tracked + adjustments per klient (avatud kuude jaoks)
+  const { data: ents, error: entErr } = await sb.from('time_entries')
+    .select('client_id, entry_type, duration_minutes, ended_at')
+    .eq('period', currentPeriod);
+  if (entErr) { showToast('Tööaega ei saanud laadida: ' + entErr.message, 'error'); return; }
+
+  entriesByClient = {};
+  (ents || []).forEach(e => {
+    if (!entriesByClient[e.client_id]) entriesByClient[e.client_id] = { tracked_minutes: 0, adj_minutes: 0 };
+    if (e.entry_type === 'adjustment') {
+      entriesByClient[e.client_id].adj_minutes += e.duration_minutes || 0;
+    } else if (e.entry_type === 'timer' || e.entry_type === 'manual') {
+      if (e.ended_at) entriesByClient[e.client_id].tracked_minutes += e.duration_minutes || 0;
+    }
+  });
+}
+
+async function refresh() {
+  await loadInvoicesAndEntries();
+  render();
+}
+
+// ── Render ──────────────────────────────────────────────────────
+function render() {
+  const grid = document.getElementById('invoices-grid');
+  if (clients.length === 0) {
+    grid.innerHTML = '<div class="empty-msg">Kliente pole.</div>';
+    return;
+  }
+
+  grid.innerHTML = clients.map(renderInvoiceCard).join('');
+
+  grid.querySelectorAll('[data-action="lock"]').forEach(b =>
+    b.addEventListener('click', () => onLock(b.dataset.client))
+  );
+  grid.querySelectorAll('[data-action="unlock"]').forEach(b =>
+    b.addEventListener('click', () => onUnlock(b.dataset.client))
+  );
+  grid.querySelectorAll('[data-action="send"]').forEach(b =>
+    b.addEventListener('click', () => onSend(b.dataset.client))
+  );
+  grid.querySelectorAll('[data-action="skip"]').forEach(b =>
+    b.addEventListener('click', () => onSkip(b.dataset.client))
+  );
+}
+
+function renderInvoiceCard(client) {
+  const inv = invoicesByClient[client.id];
+  const status = inv ? inv.status : 'open';
+  const calc = inv ? snapshotToCalc(inv) : calcOpen(client.id);
+
+  const meritWarn = !client.merit_evemee_customer_id && !client.merit_evemee_reg_no
+    ? '<span class="merit-warn">⚠ Merit klient sidumata</span>'
+    : '';
+
+  const statusLabel = {
+    open:     'avatud',
+    locked:   'lukus',
+    exported: 'eksporditud',
+    failed:   'viga',
+    skipped:  'ei esita'
+  }[status];
+
+  const rateLabel = (() => {
+    const r = inv ? { rate_eur: calc.rate_eur, is_fixed_price: calc.is_fixed_price, fixed_price_eur: calc.fixed_price_eur } : rates[client.id];
+    if (!r) return '<span style="color:var(--neg)">hind puudub</span>';
+    if (r.is_fixed_price) return `fix ${fmtEur(r.fixed_price_eur)}`;
+    return `${fmtEur(r.rate_eur)}/h`;
+  })();
+
+  return `
+    <div class="invoice-card ${status}">
+      <div class="invoice-head">
+        <div>
+          <span class="client-name">${escapeHtml(client.name)}</span>
+          <span class="client-meta">${rateLabel}</span>
+          ${meritWarn}
+        </div>
+        <span class="pill ${status}">${statusLabel}</span>
+      </div>
+
+      <div class="invoice-body">
+        <div class="stat">
+          <div class="label">Tracked</div>
+          <div class="value">${fmtHM(calc.tracked_minutes)}</div>
+        </div>
+        <div class="stat">
+          <div class="label">Adjustments</div>
+          <div class="value">${fmtHM(calc.adj_minutes)}</div>
+        </div>
+        <div class="stat">
+          <div class="label">Kokku</div>
+          <div class="value">${fmtHM(calc.total_minutes)}</div>
+        </div>
+        <div class="stat">
+          <div class="label">EUR (km-ta)</div>
+          <div class="value ${calc.missing_rate ? 'muted' : ''}">${calc.missing_rate ? 'hind puudub' : fmtEur(calc.total_eur)}</div>
+        </div>
+        <div class="stat">
+          <div class="label">+ KM 24%</div>
+          <div class="value ${calc.missing_rate ? 'muted' : ''}">${calc.missing_rate ? '—' : fmtEur(calc.vat_eur)}</div>
+        </div>
+        <div class="stat">
+          <div class="label">Kokku km-ga</div>
+          <div class="value big ${calc.missing_rate ? 'muted' : ''}">${calc.missing_rate ? '—' : fmtEur(calc.total_with_vat)}</div>
+        </div>
+      </div>
+
+      ${renderMeritInfo(inv)}
+
+      <div class="invoice-foot">
+        ${renderActions(client, inv, calc)}
+      </div>
+    </div>
+  `;
+}
+
+function snapshotToCalc(inv) {
+  const s = inv.snapshot || {};
+  return {
+    tracked_minutes: s.tracked_minutes || 0,
+    adj_minutes:     s.adj_minutes || 0,
+    total_minutes:   s.total_minutes || 0,
+    rate_eur:        s.rate_eur,
+    is_fixed_price:  s.is_fixed_price,
+    fixed_price_eur: s.fixed_price_eur,
+    total_eur:       Number(inv.total_eur),
+    vat_eur:         Number(inv.vat_eur),
+    total_with_vat:  Number(inv.total_with_vat),
+    missing_rate:    false
+  };
+}
+
+function renderMeritInfo(inv) {
+  if (!inv) return '';
+  if (inv.status === 'exported') {
+    return `
+      <div class="merit-info">
+        ✅ <strong>Meritisse saadetud</strong> ${fmtDateTime(inv.exported_at)}
+        ${inv.merit_invoice_no ? `· arve nr <code>${escapeHtml(inv.merit_invoice_no)}</code>` : ''}
+        ${inv.merit_invoice_id ? `· Merit ID <code>${escapeHtml(inv.merit_invoice_id)}</code>` : ''}
+      </div>
+    `;
+  }
+  if (inv.status === 'failed') {
+    return `
+      <div class="merit-info error">
+        ❌ <strong>Viga Meritisse saatmisel:</strong> ${escapeHtml(inv.error_message || 'Tundmatu viga')}
+      </div>
+    `;
+  }
+  if (inv.status === 'locked') {
+    return `
+      <div class="merit-info">
+        🔒 <strong>Lukus</strong> ${fmtDateTime(inv.locked_at)} — valmis Meritisse saatmiseks
+      </div>
+    `;
+  }
+  if (inv.status === 'skipped') {
+    return `
+      <div class="merit-info skip">
+        🚫 <strong>Ei esita arvet</strong> ${fmtDateTime(inv.locked_at)}
+        ${inv.skip_reason ? `· ${escapeHtml(inv.skip_reason)}` : ''}
+      </div>
+    `;
+  }
+  return '';
+}
+
+function renderActions(client, inv, calc) {
+  const status = inv ? inv.status : 'open';
+
+  if (status === 'open') {
+    const hasRate = !calc.missing_rate;
+    const hasWork = (calc.total_minutes || 0) > 0 || (calc.rate_eur === undefined && rates[client.id]?.is_fixed_price);
+    const isFixed = rates[client.id]?.is_fixed_price;
+    const canLock = hasRate && (isFixed || hasWork);
+    const dis = canLock ? '' : 'disabled';
+    const tip = !hasRate ? 'Tunnihind puudub' : (!hasWork && !isFixed ? 'Kuus pole tööaega' : '');
+    return `
+      <button class="btn-secondary" data-action="skip" data-client="${client.id}" title="Märgi: selle kuu eest arvet ei esitata">🚫 Ei esita arvet</button>
+      <button class="btn-warn" data-action="lock" data-client="${client.id}" ${dis} title="${tip}">🔒 Lukusta kuu</button>
+    `;
+  }
+
+  if (status === 'locked' || status === 'failed') {
+    const meritReady = client.merit_evemee_customer_id || client.merit_evemee_reg_no;
+    const sendDis = meritReady ? '' : 'disabled';
+    const sendLabel = status === 'failed' ? '↻ Saada uuesti' : '📤 Saada Meritisse';
+    return `
+      <button class="btn-secondary" data-action="unlock" data-client="${client.id}">🔓 Ava lukk</button>
+      <button class="btn-primary" data-action="send" data-client="${client.id}" ${sendDis}
+              title="${meritReady ? '' : 'Lisa Merit klient kliendi kaardile'}">
+        ${sendLabel}
+      </button>
+    `;
+  }
+
+  if (status === 'skipped') {
+    return `
+      <button class="btn-secondary" data-action="unlock" data-client="${client.id}">↩ Tühista</button>
+    `;
+  }
+
+  if (status === 'exported') {
+    return `<span style="color:var(--text2);font-size:12px;align-self:center">Eksporditud — terviklik</span>`;
+  }
+
+  return '';
+}
+
+// ── Actions ─────────────────────────────────────────────────────
+async function onLock(clientId) {
+  const client = clients.find(c => c.id === clientId);
+  const ok = await confirmAction(
+    'Lukusta kuu?',
+    `Lukustad ${client?.name} ${fmtPeriod(currentPeriod)} kuu. Pärast seda ei saa selle kuu tööaega muuta. Lukku saab avada kui pole veel Meritisse saadetud.`,
+    'Lukusta'
+  );
+  if (!ok) return;
+
+  const { data, error } = await sb.rpc('lock_period_for_client', {
+    p_client_id: clientId,
+    p_period:    currentPeriod
+  });
+  if (error) { showToast('Lukustamine ebaõnnestus: ' + error.message, 'error'); return; }
+  showToast(`${client?.name} kuu lukustatud`);
+  await refresh();
+}
+
+async function onUnlock(clientId) {
+  const client = clients.find(c => c.id === clientId);
+  const inv = invoicesByClient[clientId];
+  const isSkip = inv?.status === 'skipped';
+
+  const ok = await confirmAction(
+    isSkip ? 'Tühista valik?' : 'Ava lukk?',
+    isSkip
+      ? `Tühistad ${client?.name} ${fmtPeriod(currentPeriod)} "ei esita arvet" valiku. Saab uuesti lukustada või jätta arvele.`
+      : `Avad ${client?.name} ${fmtPeriod(currentPeriod)} kuu luku. Snapshot kustutatakse, tööaega saab uuesti muuta.`,
+    isSkip ? 'Tühista' : 'Ava lukk'
+  );
+  if (!ok) return;
+
+  const { error } = await sb.rpc('unlock_period_for_client', {
+    p_client_id: clientId,
+    p_period:    currentPeriod
+  });
+  if (error) { showToast('Avamine ebaõnnestus: ' + error.message, 'error'); return; }
+  showToast(`${client?.name}: ` + (isSkip ? 'valik tühistatud' : 'lukk avatud'));
+  await refresh();
+}
+
+async function onSkip(clientId) {
+  const client = clients.find(c => c.id === clientId);
+  const reason = await promptSkipReason(client?.name);
+  if (reason === null) return;
+
+  const { error } = await sb.rpc('skip_period_for_client', {
+    p_client_id: clientId,
+    p_period:    currentPeriod,
+    p_reason:    reason || null
+  });
+  if (error) { showToast('Märgistamine ebaõnnestus: ' + error.message, 'error'); return; }
+  showToast(`${client?.name}: märgitud "ei esita"`);
+  await refresh();
+}
+
+function promptSkipReason(clientName) {
+  return new Promise((resolve) => {
+    document.getElementById('skip-title').textContent = `${clientName}: ei esita arvet`;
+    const reasonEl = document.getElementById('skip-reason');
+    reasonEl.value = '';
+    const overlay = document.getElementById('skip-modal');
+    overlay.classList.add('visible');
+    setTimeout(() => reasonEl.focus(), 50);
+
+    const ok = () => { cleanup(); resolve(reasonEl.value.trim()); };
+    const cancel = () => { cleanup(); resolve(null); };
+    const cleanup = () => {
+      overlay.classList.remove('visible');
+      document.getElementById('skip-confirm-btn').removeEventListener('click', ok);
+      document.getElementById('skip-cancel-btn').removeEventListener('click', cancel);
+    };
+    document.getElementById('skip-confirm-btn').addEventListener('click', ok);
+    document.getElementById('skip-cancel-btn').addEventListener('click', cancel);
+  });
+}
+
+async function onSend(clientId) {
+  const client = clients.find(c => c.id === clientId);
+  const inv = invoicesByClient[clientId];
+  if (!inv) return;
+
+  const ok = await confirmAction(
+    'Saada Meritisse?',
+    `Loon ${client?.name} ${fmtPeriod(currentPeriod)} arve Evemee OÜ Meritis. Eve peab arve käsitsi kontrollima ja kliendile saatma — Skoor seda automaatselt EI saada.`,
+    'Saada'
+  );
+  if (!ok) return;
+
+  const btn = document.querySelector(`[data-action="send"][data-client="${clientId}"]`);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Saadan...'; }
+
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(INVOICE_WEBHOOK, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ invoice_id: inv.id })
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body.status === 'error') {
+      throw new Error(body.message || `HTTP ${res.status}`);
+    }
+    showToast(`${client?.name}: ${body.message || 'Meritisse saadetud'}`);
+  } catch (err) {
+    showToast('Viga: ' + err.message, 'error');
+  } finally {
+    await refresh();
+  }
+}
+
+// ── UI events ───────────────────────────────────────────────────
+function bindUIEvents() {
+  document.getElementById('logout-btn').addEventListener('click', () => sb.auth.signOut());
+
+  document.getElementById('period-input').addEventListener('change', async (e) => {
+    currentPeriod = e.target.value;
+    await refresh();
+  });
+  document.getElementById('prev-period-btn').addEventListener('click', async () => {
+    currentPeriod = shiftPeriod(currentPeriod, -1);
+    document.getElementById('period-input').value = currentPeriod;
+    await refresh();
+  });
+  document.getElementById('next-period-btn').addEventListener('click', async () => {
+    currentPeriod = shiftPeriod(currentPeriod, 1);
+    document.getElementById('period-input').value = currentPeriod;
+    await refresh();
+  });
+  document.getElementById('prev-month-btn').addEventListener('click', async () => {
+    currentPeriod = lastPeriod();
+    document.getElementById('period-input').value = currentPeriod;
+    await refresh();
+  });
+}
+
+init();
+</script>
+</body>
+</html>
