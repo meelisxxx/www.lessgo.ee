@@ -137,6 +137,13 @@
     }
     .btn-icon:hover { color: var(--text); }
     .btn-icon.danger:hover { color: var(--neg); }
+    .btn-icon.timer-start { color: var(--text2); font-size: 13px; }
+    .btn-icon.timer-start:hover { color: var(--accent); }
+    .btn-icon.timer-stop  { color: var(--neg); font-size: 13px; animation: row-pulse 1.5s ease-in-out infinite; }
+    .btn-icon.postpone    { color: var(--text2); }
+    .btn-icon.postpone:hover { color: var(--info); }
+    @keyframes row-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+    tr.row-active-timer td { background: rgba(16,185,129,0.06); }
 
     select, input[type="text"], input[type="email"], input[type="number"],
     input[type="datetime-local"], input[type="month"], input[type="date"], textarea {
@@ -476,6 +483,36 @@
   </div>
 </div>
 
+<!-- Postpone modal -->
+<div class="modal-overlay" id="postpone-modal">
+  <div class="modal" style="max-width: 420px">
+    <h3>Lükka edasi</h3>
+    <p class="modal-sub" id="postpone-modal-sub">&nbsp;</p>
+    <input type="hidden" id="postpone-task-id">
+
+    <div class="field">
+      <label>Praegune tähtaeg</label>
+      <p style="font-size:14px;color:var(--text2)" id="postpone-current">—</p>
+    </div>
+
+    <div class="field">
+      <button class="btn-secondary" id="postpone-plus1-btn" style="width:100%">+1 päev</button>
+    </div>
+
+    <div class="field">
+      <label for="postpone-date">Vali kuupäev</label>
+      <input type="text" id="postpone-date" placeholder="pp/kk/aaaa" inputmode="numeric" maxlength="10">
+      <p class="modal-info" id="postpone-period-hint">&nbsp;</p>
+    </div>
+
+    <p class="modal-error" id="postpone-modal-error"></p>
+    <div class="modal-actions">
+      <button class="btn-secondary" data-dismiss="postpone-modal">Tühista</button>
+      <button class="btn-primary" id="postpone-save-btn">Lükka edasi</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL  = 'https://lpehwgpitfowhyiaxrhe.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWh3Z3BpdGZvd2h5aWF4cmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzE3NDIsImV4cCI6MjA5MjYwNzc0Mn0.VRAFWMrlyigtPlDVAk9KG2NiFLd1l5aRxwmNrariUfI';
@@ -488,6 +525,7 @@ let isAdmin = false;
 let clients = [];
 let admins = [];
 let tasks = [];
+let activeTimer = null;
 let currentPeriod = todayPeriod();
 
 // URL parameetrid (nt index.html'ist klikates: ?client=ID&period=YYYY-MM)
@@ -612,6 +650,7 @@ async function init() {
 
   await loadAdmins();
   await loadClients();
+  await loadActiveTimer();
   await loadTasks();
   populateClientDropdowns();
 
@@ -646,6 +685,26 @@ async function loadClients() {
   const { data, error } = await sb.from('clients').select('id, name').order('name');
   if (error) { console.error('clients load:', error); return; }
   clients = data || [];
+}
+
+async function loadActiveTimer() {
+  const { data } = await sb.from('time_entries')
+    .select('*')
+    .eq('admin_id', currentUser.id)
+    .eq('entry_type', 'timer')
+    .is('ended_at', null)
+    .maybeSingle();
+  activeTimer = data || null;
+}
+
+function periodFromDate(iso) {
+  return iso.slice(0, 7);
+}
+
+function addDaysIso(iso, n) {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 async function loadTasks() {
@@ -727,12 +786,17 @@ function renderTable() {
     const overdue = isOverdue(t);
     const isDone = t.status === 'done';
     const isAdHoc = !t.template_id;
+    const isRunningHere = activeTimer && activeTimer.task_id === t.id;
     const completedTxt = t.completed_at
       ? `${fmtDateTime(t.completed_at)}<br><small style="color:var(--text3)">${escapeHtml(adminName(t.completed_by))}</small>`
       : '—';
 
+    const timerBtn = isRunningHere
+      ? `<button class="btn-icon timer-stop" data-timer-stop="${t.id}" title="Peata timer">⏹</button>`
+      : `<button class="btn-icon timer-start" data-timer-start="${t.id}" title="Käivita timer">▶</button>`;
+
     return `
-      <tr class="${isDone ? 'done' : ''} ${overdue ? 'overdue' : ''} row-clickable" data-id="${t.id}">
+      <tr class="${isDone ? 'done' : ''} ${overdue ? 'overdue' : ''} ${isRunningHere ? 'row-active-timer' : ''} row-clickable" data-id="${t.id}">
         <td class="col-check">
           <button class="check-btn ${isDone ? 'checked' : ''}" data-toggle="${t.id}" title="${isDone ? 'Märgi tegemata' : 'Märgi tehtud'}">
             ${isDone ? '✓' : ''}
@@ -751,6 +815,8 @@ function renderTable() {
         <td>${completedTxt}</td>
         <td class="col-actions">
           <button class="btn-icon" data-edit="${t.id}" title="Muuda">✏</button>
+          <button class="btn-icon postpone" data-postpone="${t.id}" title="Lükka edasi">📅</button>
+          ${timerBtn}
         </td>
       </tr>
     `;
@@ -767,6 +833,24 @@ function renderTable() {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       openEditModal(btn.dataset.edit);
+    });
+  });
+  tbody.querySelectorAll('[data-postpone]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openPostponeModal(btn.dataset.postpone);
+    });
+  });
+  tbody.querySelectorAll('[data-timer-start]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      startTimerForTask(btn.dataset.timerStart);
+    });
+  });
+  tbody.querySelectorAll('[data-timer-stop]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      stopTaskTimer(btn.dataset.timerStop);
     });
   });
   tbody.querySelectorAll('tr.row-clickable').forEach(row => {
@@ -946,6 +1030,153 @@ async function generateInstances() {
 function showModal(id) { document.getElementById(id).classList.add('visible'); }
 function hideModal(id) { document.getElementById(id).classList.remove('visible'); }
 
+// ── Timer shortcut (käivita / peata tööülesande pealt) ─────────
+async function startTimerForTask(taskId) {
+  const t = tasks.find(x => x.id === taskId);
+  if (!t) return;
+
+  // Kui sama task'i timer juba jookseb, ära alusta uuesti
+  if (activeTimer && activeTimer.task_id === taskId) return;
+
+  // Eelmine timer (mis tahes task'il) → peatame vaikselt
+  if (activeTimer) {
+    const { error: stopErr } = await sb.from('time_entries').update({
+      ended_at: new Date().toISOString(),
+      edited_at: new Date().toISOString(),
+      edited_by: currentUser.id
+    }).eq('id', activeTimer.id);
+    if (stopErr) {
+      alert('Eelmise timeri peatamisel viga: ' + stopErr.message);
+      return;
+    }
+    activeTimer = null;
+  }
+
+  // Uus timer — kommentaar = ülesande nimi (kasutaja saab hiljem timer.html-is muuta)
+  const nowIso = new Date().toISOString();
+  const { data, error } = await sb.from('time_entries').insert({
+    admin_id: currentUser.id,
+    client_id: t.client_id,
+    task_id: t.id,
+    entry_type: 'timer',
+    started_at: nowIso,
+    duration_minutes: 0,
+    period: nowIso.slice(0, 7),
+    comment: t.name,
+    created_by: currentUser.id
+  }).select().single();
+
+  if (error) {
+    if (error.code === '23505') {
+      // Race: teine tab käivitas timeri samal ajal
+      await loadActiveTimer();
+      renderTable();
+      alert('Sul juba jookseb timer (võib-olla teises tabis).');
+    } else {
+      alert('Timeri käivitamisel viga: ' + error.message);
+    }
+    return;
+  }
+  activeTimer = data;
+  renderTable();
+}
+
+async function stopTaskTimer(taskId) {
+  if (!activeTimer || activeTimer.task_id !== taskId) return;
+  const { error } = await sb.from('time_entries').update({
+    ended_at: new Date().toISOString(),
+    edited_at: new Date().toISOString(),
+    edited_by: currentUser.id
+  }).eq('id', activeTimer.id);
+  if (error) {
+    alert('Timeri peatamisel viga: ' + error.message);
+    return;
+  }
+  activeTimer = null;
+  renderTable();
+}
+
+// ── Lükka edasi ─────────────────────────────────────────────────
+let postponeOriginalDue = null; // aitab "+1 päev" arvutust
+
+function openPostponeModal(taskId) {
+  const t = tasks.find(x => x.id === taskId);
+  if (!t) return;
+  postponeOriginalDue = t.due_date;
+  document.getElementById('postpone-task-id').value = t.id;
+  document.getElementById('postpone-modal-sub').textContent = `${clientName(t.client_id)} — ${t.name}`;
+  document.getElementById('postpone-current').textContent = fmtDate(t.due_date);
+  document.getElementById('postpone-date').value = isoToDDMMYYYY(t.due_date);
+  document.getElementById('postpone-period-hint').innerHTML = '&nbsp;';
+  showError('postpone-modal-error', '');
+  showModal('postpone-modal');
+}
+
+function updatePostponePeriodHint() {
+  const raw = document.getElementById('postpone-date').value;
+  const iso = parseDDMMYYYY(raw);
+  const hint = document.getElementById('postpone-period-hint');
+  if (!iso) { hint.innerHTML = '&nbsp;'; return; }
+  const newPeriod = periodFromDate(iso);
+  const t = tasks.find(x => x.id === document.getElementById('postpone-task-id').value);
+  if (t && newPeriod !== t.period) {
+    hint.textContent = `Ülesanne liigub perioodi ${newPeriod}`;
+    hint.style.color = 'var(--warn)';
+  } else {
+    hint.innerHTML = '&nbsp;';
+    hint.style.color = '';
+  }
+}
+
+async function postponeQuick(days) {
+  const taskId = document.getElementById('postpone-task-id').value;
+  const t = tasks.find(x => x.id === taskId);
+  if (!t) return;
+  const newDue = addDaysIso(t.due_date, days);
+  await applyPostpone(taskId, newDue);
+}
+
+async function postponeFromInput() {
+  const taskId = document.getElementById('postpone-task-id').value;
+  const raw = document.getElementById('postpone-date').value;
+  const iso = parseDDMMYYYY(raw);
+  if (!iso) {
+    showError('postpone-modal-error', 'Vigane kuupäev. Formaat: pp/kk/aaaa.');
+    return;
+  }
+  await applyPostpone(taskId, iso);
+}
+
+async function applyPostpone(taskId, newDueIso) {
+  const t = tasks.find(x => x.id === taskId);
+  if (!t) return;
+  const newPeriod = periodFromDate(newDueIso);
+  const btn = document.getElementById('postpone-save-btn');
+  btn.disabled = true;
+
+  const { error } = await sb.from('task_instances').update({
+    due_date: newDueIso,
+    period: newPeriod,
+    edited_at: new Date().toISOString(),
+    edited_by: currentUser.id
+  }).eq('id', taskId);
+
+  btn.disabled = false;
+
+  if (error) {
+    if (error.code === '23505') {
+      showError('postpone-modal-error',
+        `Selle malli ülesanne on perioodis ${newPeriod} juba olemas. Vali teine kuupäev või kustuta olemasolev.`);
+    } else {
+      showError('postpone-modal-error', 'Viga: ' + error.message);
+    }
+    return;
+  }
+
+  hideModal('postpone-modal');
+  await loadTasks();
+}
+
 // ── UI events ───────────────────────────────────────────────────
 function bindUIEvents() {
   document.getElementById('logout-btn').addEventListener('click', () => sb.auth.signOut());
@@ -956,12 +1187,23 @@ function bindUIEvents() {
   document.getElementById('task-save-btn').addEventListener('click', saveTask);
   document.getElementById('task-delete-btn').addEventListener('click', deleteTask);
 
+  document.getElementById('postpone-plus1-btn').addEventListener('click', () => postponeQuick(1));
+  document.getElementById('postpone-save-btn').addEventListener('click', postponeFromInput);
+  document.getElementById('postpone-date').addEventListener('input', updatePostponePeriodHint);
+
   // Flatpickr: kalender popup tähtaja inputil (DD/MM/YYYY, Eesti locale)
   flatpickr('#task-due', {
     locale: 'et',
     dateFormat: 'd/m/Y',
     allowInput: true,
     disableMobile: true
+  });
+  flatpickr('#postpone-date', {
+    locale: 'et',
+    dateFormat: 'd/m/Y',
+    allowInput: true,
+    disableMobile: true,
+    onChange: updatePostponePeriodHint
   });
 
   // Modal close
