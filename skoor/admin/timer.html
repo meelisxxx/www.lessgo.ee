@@ -409,8 +409,6 @@
               <th>Tracked</th>
               <th>Adjustments</th>
               <th>Kokku</th>
-              <th>Hind</th>
-              <th>EUR (käibemaksuta)</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -418,9 +416,6 @@
       </div>
       <div class="summary-totals" id="summary-totals">
         <div><div class="label">Kokku tunnid</div><div class="value" id="total-hours">—</div></div>
-        <div><div class="label">Kokku EUR (km-ta)</div><div class="value" id="total-eur">—</div></div>
-        <div><div class="label">+ KM 24%</div><div class="value" id="total-vat">—</div></div>
-        <div><div class="label">Kokku EUR (km-ga)</div><div class="value" id="total-eur-vat">—</div></div>
       </div>
     </div>
 
@@ -1119,33 +1114,16 @@ function renderSummary() {
     .sort((a, b) => clientName(a.cid).localeCompare(clientName(b.cid)));
 
   if (sortedClients.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">Selles kuus pole kandeid</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-msg">Selles kuus pole kandeid</td></tr>';
     document.getElementById('total-hours').textContent = '0h 00m';
-    document.getElementById('total-eur').textContent = fmtEur(0);
-    document.getElementById('total-vat').textContent = fmtEur(0);
-    document.getElementById('total-eur-vat').textContent = fmtEur(0);
     return;
   }
 
   let totalMinutes = 0;
-  let totalEur = 0;
 
   tbody.innerHTML = sortedClients.map(({ cid, tracked, adjustments }) => {
     const totalMin = tracked + adjustments;
-    const rate = rates[cid];
-    let priceLabel, eurAmount;
-    if (rate?.is_fixed_price) {
-      priceLabel = `fix: ${fmtEur(rate.fixed_price_eur)}`;
-      eurAmount = rate.fixed_price_eur;
-    } else if (rate?.rate_eur != null) {
-      priceLabel = `${fmtEur(rate.rate_eur)}/h`;
-      eurAmount = (totalMin / 60) * rate.rate_eur;
-    } else {
-      priceLabel = '<span style="color:var(--warn)">hind puudub</span>';
-      eurAmount = 0;
-    }
     totalMinutes += totalMin;
-    totalEur += eurAmount;
 
     return `
       <tr>
@@ -1153,17 +1131,11 @@ function renderSummary() {
         <td>${formatHM(tracked)}</td>
         <td>${formatHM(adjustments)}</td>
         <td>${formatHM(totalMin)}</td>
-        <td>${priceLabel}</td>
-        <td>${fmtEur(eurAmount)}</td>
       </tr>
     `;
   }).join('');
 
   document.getElementById('total-hours').textContent = formatHM(totalMinutes);
-  document.getElementById('total-eur').textContent = fmtEur(totalEur);
-  const vat = totalEur * 0.24;
-  document.getElementById('total-vat').textContent = fmtEur(vat);
-  document.getElementById('total-eur-vat').textContent = fmtEur(totalEur + vat);
 }
 
 // ── Modals ──────────────────────────────────────────────────────

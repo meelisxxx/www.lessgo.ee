@@ -6,6 +6,8 @@
   <title>Skoor Admin — Ülesanded</title>
   <script>(function(){try{const t=localStorage.getItem('skoor-theme')||'system';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
   <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="timer-banner.css">
+  <script src="timer-banner.js" defer></script>
   <link rel="icon" type="image/png" href="../../Logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -146,6 +148,9 @@
     .btn-icon.postpone:hover { color: var(--info); }
     @keyframes row-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
     tr.row-active-timer td { background: rgba(16,185,129,0.06); }
+
+    .postpone-calendar { display: flex; justify-content: center; }
+    .postpone-calendar .flatpickr-calendar.inline { box-shadow: none; margin: 0; }
 
     select, input[type="text"], input[type="email"], input[type="number"],
     input[type="datetime-local"], input[type="month"], input[type="date"], textarea {
@@ -503,8 +508,8 @@
     </div>
 
     <div class="field">
-      <label for="postpone-date">Vali kuupäev</label>
-      <input type="text" id="postpone-date" placeholder="pp/kk/aaaa" inputmode="numeric" maxlength="10">
+      <input type="hidden" id="postpone-date">
+      <div id="postpone-calendar" class="postpone-calendar"></div>
       <p class="modal-info" id="postpone-period-hint">&nbsp;</p>
     </div>
 
@@ -669,6 +674,8 @@ async function init() {
   document.getElementById('app').style.display = 'flex';
 
   bindUIEvents();
+
+  await SkoorTimerBanner.init({ sb, currentUser, getClientName: clientName });
 
   sb.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') window.location.href = '../';
@@ -1082,6 +1089,7 @@ async function startTimerForTask(taskId) {
   }
   activeTimer = data;
   renderTable();
+  if (window.SkoorTimerBanner) SkoorTimerBanner.refresh();
 }
 
 async function stopTaskTimer(taskId) {
@@ -1097,10 +1105,16 @@ async function stopTaskTimer(taskId) {
   }
   activeTimer = null;
   renderTable();
+  if (window.SkoorTimerBanner) SkoorTimerBanner.refresh();
 }
 
 // ── Lükka edasi ─────────────────────────────────────────────────
 let postponeOriginalDue = null; // aitab "+1 päev" arvutust
+let postponeFp = null;          // flatpickr instance (inline kalender)
+
+function dateToIso(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 
 function openPostponeModal(taskId) {
   const t = tasks.find(x => x.id === taskId);
@@ -1109,17 +1123,17 @@ function openPostponeModal(taskId) {
   document.getElementById('postpone-task-id').value = t.id;
   document.getElementById('postpone-modal-sub').textContent = `${clientName(t.client_id)} — ${t.name}`;
   document.getElementById('postpone-current').textContent = fmtDate(t.due_date);
-  document.getElementById('postpone-date').value = isoToDDMMYYYY(t.due_date);
+  if (postponeFp) postponeFp.setDate(t.due_date, false);
   document.getElementById('postpone-period-hint').innerHTML = '&nbsp;';
   showError('postpone-modal-error', '');
   showModal('postpone-modal');
 }
 
 function updatePostponePeriodHint() {
-  const raw = document.getElementById('postpone-date').value;
-  const iso = parseDDMMYYYY(raw);
+  const sel = postponeFp && postponeFp.selectedDates[0];
   const hint = document.getElementById('postpone-period-hint');
-  if (!iso) { hint.innerHTML = '&nbsp;'; return; }
+  if (!sel) { hint.innerHTML = '&nbsp;'; return; }
+  const iso = dateToIso(sel);
   const newPeriod = periodFromDate(iso);
   const t = tasks.find(x => x.id === document.getElementById('postpone-task-id').value);
   if (t && newPeriod !== t.period) {
@@ -1141,13 +1155,12 @@ async function postponeQuick(days) {
 
 async function postponeFromInput() {
   const taskId = document.getElementById('postpone-task-id').value;
-  const raw = document.getElementById('postpone-date').value;
-  const iso = parseDDMMYYYY(raw);
-  if (!iso) {
-    showError('postpone-modal-error', 'Vigane kuupäev. Formaat: pp/kk/aaaa.');
+  const sel = postponeFp && postponeFp.selectedDates[0];
+  if (!sel) {
+    showError('postpone-modal-error', 'Vali kuupäev kalendrist.');
     return;
   }
-  await applyPostpone(taskId, iso);
+  await applyPostpone(taskId, dateToIso(sel));
 }
 
 async function applyPostpone(taskId, newDueIso) {
@@ -1192,7 +1205,6 @@ function bindUIEvents() {
 
   document.getElementById('postpone-plus1-btn').addEventListener('click', () => postponeQuick(1));
   document.getElementById('postpone-save-btn').addEventListener('click', postponeFromInput);
-  document.getElementById('postpone-date').addEventListener('input', updatePostponePeriodHint);
 
   // Flatpickr: kalender popup tähtaja inputil (DD/MM/YYYY, Eesti locale)
   flatpickr('#task-due', {
@@ -1201,11 +1213,11 @@ function bindUIEvents() {
     allowInput: true,
     disableMobile: true
   });
-  flatpickr('#postpone-date', {
+  postponeFp = flatpickr('#postpone-date', {
     locale: 'et',
-    dateFormat: 'd/m/Y',
-    allowInput: true,
-    disableMobile: true,
+    dateFormat: 'Y-m-d',
+    inline: true,
+    appendTo: document.getElementById('postpone-calendar'),
     onChange: updatePostponePeriodHint
   });
 

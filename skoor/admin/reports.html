@@ -6,6 +6,8 @@
   <title>Skoor Admin — Arved</title>
   <script>(function(){try{const t=localStorage.getItem('skoor-theme')||'system';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
   <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="timer-banner.css">
+  <script src="timer-banner.js" defer></script>
   <link rel="icon" type="image/png" href="../../Logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -515,6 +517,11 @@ async function init() {
   bindUIEvents();
 
   await refresh();
+
+  await SkoorTimerBanner.init({
+    sb, currentUser,
+    getClientName: (id) => (clients.find(c => c.id === id) || {}).name || id
+  });
 
   sb.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') window.location.href = '../';
