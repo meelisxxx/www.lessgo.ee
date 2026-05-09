@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skoor Admin — Seaded</title>
+  <script>(function(){try{const t=localStorage.getItem('skoor-theme')||'system';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+  <link rel="stylesheet" href="theme.css">
+  <link rel="icon" type="image/png" href="../../Logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #111827;
+      --bg2:      #1f2937;
+      --bg3:      #374151;
+      --border:   rgba(255,255,255,0.08);
+      --text:     #f9fafb;
+      --text2:    #9ca3af;
+      --text3:    #6b7280;
+      --accent:   #10b981;
+      --pos:      #10b981;
+      --neg:      #ef4444;
+      --warn:     #f59e0b;
+      --info:     #818cf8;
+      --radius:   12px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { opacity: 0.8; }
+
+    #loading-screen, #denied-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      text-align: center;
+    }
+    #denied-screen h2 { color: var(--neg); margin-bottom: 12px; }
+    #denied-screen p { color: var(--text2); margin-bottom: 24px; }
+
+    #app { display: none; flex-direction: column; min-height: 100vh; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-logo { width: 36px; height: 36px; border-radius: 50%; }
+    .header-title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
+    .header-title .badge {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-left: 8px;
+      vertical-align: middle;
+      letter-spacing: 1px;
+    }
+    .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    .nav-link {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text2);
+      font-size: 13px;
+    }
+    .nav-link:hover { color: var(--text); border-color: var(--text2); opacity: 1; }
+    .nav-link.active { color: var(--text); border-color: var(--accent); background: rgba(16,185,129,0.08); }
+
+    button {
+      cursor: pointer;
+      font-family: inherit;
+      border: none;
+      border-radius: 8px;
+      transition: opacity 0.2s, background 0.2s, border-color 0.2s;
+    }
+    .btn-secondary {
+      background: var(--bg3);
+      color: var(--text);
+      padding: 8px 14px;
+      font-size: 13px;
+    }
+    .btn-secondary:hover:not(:disabled) { background: var(--hover-strong); }
+
+    main { padding: 24px; max-width: 720px; margin: 0 auto; width: 100%; }
+
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      margin-bottom: 20px;
+    }
+    .card h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text2);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .card p.subtitle {
+      font-size: 13px;
+      color: var(--text3);
+      margin-bottom: 16px;
+    }
+
+    .theme-options {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .theme-option {
+      background: var(--bg3);
+      border: 2px solid transparent;
+      border-radius: 10px;
+      padding: 18px 14px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      color: var(--text);
+    }
+    .theme-option:hover { background: var(--hover-strong); }
+    .theme-option.active {
+      border-color: var(--accent);
+      background: rgba(16,185,129,0.08);
+    }
+    .theme-option .icon {
+      font-size: 28px;
+      display: block;
+      margin-bottom: 8px;
+    }
+    .theme-option .label {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .theme-option .desc {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 4px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--hover-soft);
+      font-size: 14px;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .label { color: var(--text2); }
+    .info-row .value { color: var(--text); font-variant-numeric: tabular-nums; }
+
+    @media (max-width: 540px) {
+      header { padding: 12px 16px; }
+      main { padding: 16px; }
+      .theme-options { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading-screen" style="display:flex">
+  <p style="color: var(--text2)">Laen...</p>
+</div>
+
+<div id="denied-screen">
+  <h2>Ligipääs keelatud</h2>
+  <p>Sul pole admin õigusi.</p>
+  <a href="../" class="nav-link">← Skoor avalehele</a>
+</div>
+
+<div id="app">
+  <header>
+    <a href="../" class="header-left" style="color:inherit">
+      <img src="../../Logo.png" alt="LessGo" class="header-logo">
+      <span class="header-title">Skoor<span class="badge">ADMIN</span></span>
+    </a>
+    <div class="header-right">
+      <a href="index.html" class="nav-link">Töölaud</a>
+      <a href="timer.html" class="nav-link">Tööaeg</a>
+      <a href="tasks.html" class="nav-link">Ülesanded</a>
+      <a href="reports.html" class="nav-link">Arved</a>
+      <a href="clients.html" class="nav-link">Kliendid</a>
+      <a href="templates.html" class="nav-link">Mallid</a>
+      <a href="settings.html" class="nav-link active">Seaded</a>
+      <a href="../" class="nav-link">← Klientide vaade</a>
+      <button class="btn-secondary" id="logout-btn">Logi välja</button>
+    </div>
+  </header>
+
+  <main>
+
+    <div class="card">
+      <h2>Teema</h2>
+      <p class="subtitle">Vali, kuidas Skoor admin paneeli kuvada. Eelistus salvestatakse selles brauseris.</p>
+      <div class="theme-options" id="theme-options">
+        <button class="theme-option" data-theme="dark">
+          <span class="icon">🌙</span>
+          <span class="label">Tume</span>
+          <div class="desc">Vaikimisi</div>
+        </button>
+        <button class="theme-option" data-theme="light">
+          <span class="icon">☀️</span>
+          <span class="label">Hele</span>
+          <div class="desc">Hele taust</div>
+        </button>
+        <button class="theme-option" data-theme="system">
+          <span class="icon">💻</span>
+          <span class="label">Süsteem</span>
+          <div class="desc">Järgi OS-i</div>
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Konto</h2>
+      <div class="info-row">
+        <span class="label">Sisse logitud kasutaja</span>
+        <span class="value" id="info-email">—</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Nimi (display_name)</span>
+        <span class="value" id="info-name">—</span>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const SUPABASE_URL  = 'https://lpehwgpitfowhyiaxrhe.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWh3Z3BpdGZvd2h5aWF4cmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzE3NDIsImV4cCI6MjA5MjYwNzc0Mn0.VRAFWMrlyigtPlDVAk9KG2NiFLd1l5aRxwmNrariUfI';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let currentUser = null;
+
+function applyTheme(theme) {
+  localStorage.setItem('skoor-theme', theme);
+  document.documentElement.setAttribute('data-theme', theme);
+  document.querySelectorAll('.theme-option').forEach(el => {
+    el.classList.toggle('active', el.dataset.theme === theme);
+  });
+}
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = '../'; return; }
+  currentUser = session.user;
+
+  const { data: adminRow } = await sb.from('admins').select('user_id, display_name').eq('user_id', currentUser.id).maybeSingle();
+  if (!adminRow) {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('denied-screen').style.display = 'flex';
+    return;
+  }
+
+  document.getElementById('info-email').textContent = currentUser.email || '—';
+  document.getElementById('info-name').textContent = adminRow.display_name || '(määramata)';
+
+  // Tehe-aktiivseks praegune teema
+  const currentTheme = localStorage.getItem('skoor-theme') || 'system';
+  applyTheme(currentTheme);
+
+  document.querySelectorAll('.theme-option').forEach(el => {
+    el.addEventListener('click', () => applyTheme(el.dataset.theme));
+  });
+
+  document.getElementById('logout-btn').addEventListener('click', () => sb.auth.signOut());
+
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  sb.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT') window.location.href = '../';
+  });
+}
+
+init();
+</script>
+</body>
+</html>

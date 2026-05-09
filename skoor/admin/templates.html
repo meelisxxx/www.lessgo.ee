@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Skoor Admin — Mallid</title>
+  <script>(function(){try{const t=localStorage.getItem('skoor-theme')||'system';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+  <link rel="stylesheet" href="theme.css">
   <link rel="icon" type="image/png" href="../../Logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -113,7 +115,7 @@
       padding: 8px 14px;
       font-size: 13px;
     }
-    .btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+    .btn-secondary:hover:not(:disabled) { background: var(--hover-strong); }
     .btn-danger {
       background: var(--neg);
       color: #fff;
@@ -166,9 +168,9 @@
     .templates-scroll { overflow-x: auto; }
     .templates-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 760px; }
     .templates-table th { text-align: left; color: var(--text3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; padding: 0 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-    .templates-table td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: top; }
+    .templates-table td { padding: 12px 10px; border-bottom: 1px solid var(--hover-soft); vertical-align: top; }
     .templates-table tr:not(.row-disabled) { cursor: pointer; }
-    .templates-table tr:not(.row-disabled):hover td { background: rgba(255,255,255,0.02); }
+    .templates-table tr:not(.row-disabled):hover td { background: var(--hover-faint); }
     .templates-table tr.row-disabled td { opacity: 0.45; }
     .templates-table .col-name strong { font-weight: 600; }
     .templates-table .col-name .desc { display: block; font-size: 12px; color: var(--text3); margin-top: 2px; }
@@ -190,9 +192,9 @@
     .pill.recur-monthly   { background: rgba(129,140,248,0.15); color: var(--info); }
     .pill.recur-quarterly { background: rgba(99,102,241,0.18); color: #a5b4fc; }
     .pill.recur-yearly    { background: rgba(16,185,129,0.15); color: var(--accent); }
-    .pill.recur-once      { background: rgba(255,255,255,0.05); color: var(--text2); border: 1px solid var(--border); }
+    .pill.recur-once      { background: var(--hover-mid); color: var(--text2); border: 1px solid var(--border); }
     .pill.active          { background: rgba(16,185,129,0.15); color: var(--accent); }
-    .pill.inactive        { background: rgba(255,255,255,0.05); color: var(--text3); border: 1px solid var(--border); }
+    .pill.inactive        { background: var(--hover-mid); color: var(--text3); border: 1px solid var(--border); }
 
     .empty-msg { text-align: center; color: var(--text2); padding: 40px 0; }
 
@@ -292,6 +294,7 @@
       <a href="reports.html" class="nav-link">Arved</a>
       <a href="clients.html" class="nav-link">Kliendid</a>
       <a href="templates.html" class="nav-link active">Mallid</a>
+      <a href="settings.html" class="nav-link">Seaded</a>
       <a href="../" class="nav-link">← Klientide vaade</a>
       <button class="btn-secondary" id="logout-btn">Logi välja</button>
     </div>
