@@ -651,7 +651,7 @@ function localInputToIso(local) {
 
 function adminName(userId) {
   const a = admins.find(x => x.user_id === userId);
-  return a?.email?.split('@')[0] || userId.slice(0, 8);
+  return a?.display_name || a?.email?.split('@')[0] || userId.slice(0, 8);
 }
 
 function clientName(id) {
@@ -705,12 +705,11 @@ async function init() {
 }
 
 async function loadAdmins() {
-  // Admins tabel ei pruugi sisaldada emaile — kasutame current user email'i ainult
-  // Edaspidi võiks lisada nimed admins tabeli.
-  const { data } = await sb.from('admins').select('user_id');
+  const { data } = await sb.from('admins').select('user_id, display_name');
   admins = (data || []).map(a => ({
     user_id: a.user_id,
-    email: a.user_id === currentUser.id ? currentUser.email : a.user_id.slice(0, 8)
+    display_name: a.display_name,
+    email: a.user_id === currentUser.id ? currentUser.email : null
   }));
 }
 
@@ -763,7 +762,7 @@ function populateClientDropdowns() {
 function populateAdminDropdown() {
   const sel = document.getElementById('filter-admin');
   sel.innerHTML = '<option value="">Kõik adminid</option>' +
-    admins.map(a => `<option value="${a.user_id}">${escapeHtml(a.email.split('@')[0])}</option>`).join('');
+    admins.map(a => `<option value="${a.user_id}">${escapeHtml(adminName(a.user_id))}</option>`).join('');
 }
 
 // ── Timer loop ──────────────────────────────────────────────────
