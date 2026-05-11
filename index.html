@@ -76,13 +76,27 @@
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
     <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:       #111827;
+            --bg2:      #1f2937;
+            --bg3:      #374151;
+            --border:   rgba(255,255,255,0.08);
+            --text:     #f9fafb;
+            --text2:    #9ca3af;
+            --text3:    #6b7280;
+            --accent:   #10b981;
+            --neg:      #ef4444;
+            --radius:   12px;
+        }
+
         body {
-            background-color: #333333;
-            margin: 0;
-            padding: 0;
-            color: white;
+            background: var(--bg);
+            color: var(--text);
             font-family: 'Inter', sans-serif;
             line-height: 1.6;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -100,60 +114,53 @@
             height: auto;
             border-radius: 50%;
             box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
 
-        h1 { font-weight: 600; font-size: 2.2em; margin-bottom: 5px; letter-spacing: -0.5px; }
-        h2 { font-weight: 600; color: #ffffff; margin-top: 40px; margin-bottom: 20px; text-align: left; }
-        p { color: #cccccc; font-size: 1.05em; }
-
-        .services {
-            text-align: left;
-            margin: 40px 0;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 30px;
-            border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        h1 {
+            font-weight: 700;
+            font-size: 2.2em;
+            letter-spacing: -0.5px;
+            color: var(--text);
         }
 
-        .services strong { color: #ffffff; }
-
-        .pricing {
-            text-align: left;
-            margin: 40px 0;
-            background: rgba(255, 255, 255, 0.03); 
-            padding: 35px;
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        .price-box {
-            margin-top: 25px;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
-            border-left: 4px solid #ffffff; 
-        }
-
-        .price-tag {
-            font-size: 1.2em;
+        h2 {
             font-weight: 600;
-            color: #ffffff;
+            color: var(--text);
+            margin-bottom: 20px;
+            text-align: left;
+            font-size: 1.35em;
+        }
+
+        .notice {
+            margin: 56px 0 48px;
+            padding: 40px 28px;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text2);
+            font-size: 1.05em;
+            letter-spacing: 0.3px;
+        }
+        .notice strong {
             display: block;
-            margin-bottom: 5px;
+            color: var(--accent);
+            font-weight: 600;
+            font-size: 1.2em;
+            letter-spacing: 0.5px;
         }
 
         .contact-section {
             text-align: left;
-            margin-top: 50px;
+            margin-top: 24px;
             width: 100%;
         }
 
         .contact-form {
-            background: #2a2a2a;
+            background: var(--bg2);
             padding: 30px;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
         }
 
         #form-status {
@@ -167,66 +174,75 @@
             display: block;
             background: rgba(16,185,129,0.12);
             border: 1px solid rgba(16,185,129,0.4);
-            color: #10b981;
+            color: var(--accent);
         }
         #form-status.form-error {
             display: block;
             background: rgba(239,68,68,0.12);
             border: 1px solid rgba(239,68,68,0.4);
-            color: #ef4444;
+            color: var(--neg);
         }
 
         .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; color: #bbb; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; }
-        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text2);
+            font-size: 0.8em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
         input, textarea {
             width: 100%;
-            padding: 14px;
-            border: 1px solid #444;
-            background: #3a3a3a;
-            color: white;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            background: var(--bg3);
+            color: var(--text);
             border-radius: 8px;
-            box-sizing: border-box;
             font-family: 'Inter', sans-serif;
             font-size: 1em;
-            transition: border-color 0.3s;
-        }
-
-        input:focus, textarea:focus {
+            transition: border-color 0.2s;
             outline: none;
-            border-color: #777;
         }
+        input:focus, textarea:focus { border-color: var(--accent); }
+        input::placeholder, textarea::placeholder { color: var(--text3); }
 
         button {
-            background-color: #ffffff;
-            color: #333;
+            background-color: var(--accent);
+            color: #fff;
             border: none;
-            padding: 15px 25px;
+            padding: 14px 25px;
             font-weight: 600;
             border-radius: 8px;
             cursor: pointer;
-            transition: transform 0.2s, background-color 0.2s;
+            transition: opacity 0.2s, transform 0.2s;
             width: 100%;
             font-size: 1em;
+            font-family: inherit;
         }
-
         button:hover {
-            background-color: #e5e5e5;
-            transform: translateY(-2px);
+            opacity: 0.88;
+            transform: translateY(-1px);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .footer {
-            margin-top: 80px;
-            padding-bottom: 40px;
+            margin-top: 60px;
+            padding: 30px 0 40px;
             font-size: 0.95em;
-            color: #888;
-            border-top: 1px solid #444;
+            color: var(--text2);
+            border-top: 1px solid var(--border);
             width: 100%;
-            padding-top: 30px;
+            text-align: center;
         }
 
-        a { color: #ffffff; text-decoration: none; transition: opacity 0.2s; }
-        a:hover { opacity: 0.7; }
+        a { color: var(--text); text-decoration: none; transition: color 0.2s; }
+        a:hover { color: var(--accent); }
 
         /* WHATSAPP STYLES */
         .whatsapp-float {
@@ -236,11 +252,11 @@
             bottom: 20px;
             right: 20px;
             background-color: #25d366;
-            color: #FFF;
-            border-radius: 50px;
+            color: #fff;
+            border-radius: 50%;
             text-align: center;
             font-size: 30px;
-            box-shadow: 2px 2px 3px #999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.35);
             z-index: 1000;
             display: flex;
             align-items: center;
@@ -250,30 +266,30 @@
         }
         .whatsapp-float:hover {
             transform: scale(1.1);
-            color: #FFF;
+            color: #fff;
         }
 
         .linkedin-link {
             display: inline-block;
             margin-top: 15px;
             background: #0077b5;
-            color: white;
+            color: #fff;
             padding: 8px 16px;
             border-radius: 6px;
             font-size: 0.9em;
         }
-        .linkedin-link:hover { opacity: 0.9; }
+        .linkedin-link:hover { opacity: 0.9; color: #fff; }
 
         /* GDPR cookie banner */
         #cookie-banner {
             display: none;
             position: fixed;
             bottom: 0; left: 0; right: 0;
-            background: #1a1a1a;
-            border-top: 1px solid #444;
+            background: var(--bg2);
+            border-top: 1px solid var(--border);
             padding: 18px 20px;
             z-index: 2000;
-            color: #ddd;
+            color: var(--text);
             font-size: 0.92em;
             box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
         }
@@ -286,7 +302,7 @@
             gap: 14px;
             justify-content: space-between;
         }
-        #cookie-banner p { margin: 0; flex: 1 1 320px; color: #bbb; line-height: 1.5; }
+        #cookie-banner p { margin: 0; flex: 1 1 320px; color: var(--text2); line-height: 1.5; }
         #cookie-banner .cb-buttons { display: flex; gap: 10px; }
         #cookie-banner button {
             width: auto;
@@ -296,11 +312,13 @@
         }
         #cookie-banner button.cb-reject {
             background: transparent;
-            color: #ccc;
-            border: 1px solid #555;
+            color: var(--text2);
+            border: 1px solid var(--border);
         }
         #cookie-banner button.cb-reject:hover {
             background: rgba(255,255,255,0.05);
+            color: var(--text);
+            opacity: 1;
             transform: none;
         }
     </style>
@@ -308,30 +326,13 @@
 <body>
 
     <div class="container">
-        <img src="Logo.png" alt="LessGo OÜ - automatiseeritud raamatupidamine" class="logo">
-        
+        <img src="Logo.png" alt="LessGo OÜ" class="logo">
+
         <h1>LessGo OÜ</h1>
-        <p>Kaasaegne raamatupidamispartner sinu ettevõttele</p>
 
-        <section class="services" itemscope itemtype="https://schema.org/Service">
-            <h2 itemprop="name">Kaasaegsed raamatupidamisteenused</h2>
-            <div itemprop="description">
-                <p>Pakume kaasaegseid, täielikult <strong>automatiseeritud digitaalseid raamatupidamislahendusi</strong>, mis tagavad ajasäästu ja täpsuse. Meie eesmärk on muuta finantshaldus nähtamatuks ja efektiivseks protsessiks.</p>
-                <p>Paberivaba üleminek: <strong>digitaliseerime teie paberdokumendid ja tšekid</strong> kiiresti, et andmed jõuaksid automaatselt raamatupidamisse.</p>
-                <p>Kasutame tehisintellekti, nutikaid liideseid ja töövoogude automatiseerimist, et vabastada teid andmete sisestamisest ning pakkuda reaalajas ülevaadet ettevõtte käekäigust.</p>
-            </div>
-            <meta itemprop="serviceType" content="AI raamatupidamine ja paberivaba automatiseerimine">
-        </section>
-
-        <section class="pricing">
-            <h2>Hinnakiri</h2>
-            <p>Raamatupidamisteenus sisaldab dokumentide ja pangatehingute kajastamist, igakuiste maksudeklaratsioonide ning aastaaruande koostamist.</p>
-            
-            <div class="price-box">
-                <span class="price-tag">Teenuse hind: 40 € / tund</span>
-                <p style="margin: 0; font-size: 0.95em;">Tegevust alustava või väiksema ettevõtte kuutasu on alates <strong>40 €</strong>.</p>
-            </div>
-        </section>
+        <div class="notice">
+            <strong>Leht on uuendamisel</strong>
+        </div>
 
         <section class="contact-section">
             <h2>Võta ühendust</h2>
