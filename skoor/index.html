@@ -414,6 +414,13 @@
       <p class="error-msg" id="reset-msg"></p>
       <p class="forgot-link"><a href="#" id="back-to-login" data-i18n="auth.back">← Tagasi sisselogimisse</a></p>
     </div>
+    <div id="new-password-form" style="display:none">
+      <p class="auth-subtitle" style="margin-bottom:16px" data-i18n="auth.new_pwd_intro">Sisesta uus parool.</p>
+      <input type="password" id="new-password" placeholder="Uus parool" data-i18n-placeholder="auth.new_password" autocomplete="new-password">
+      <input type="password" id="new-password-confirm" placeholder="Korda parooli" data-i18n-placeholder="auth.new_password_confirm" autocomplete="new-password">
+      <button class="btn-primary" id="new-password-btn" data-i18n="auth.set_password">Määra parool</button>
+      <p class="error-msg" id="new-password-msg"></p>
+    </div>
   </div>
 </div>
 
@@ -596,6 +603,13 @@ const I18N = {
     'auth.link_sent': 'Link saadetud! Kontrolli oma postkasti.',
     'auth.error_prefix': 'Viga: ',
     'auth.back': '← Tagasi sisselogimisse',
+    'auth.new_pwd_intro': 'Sisesta uus parool.',
+    'auth.new_password': 'Uus parool',
+    'auth.new_password_confirm': 'Korda parooli',
+    'auth.set_password': 'Määra parool',
+    'auth.setting_password': 'Salvestan...',
+    'auth.password_set': 'Parool muudetud! Logi sisse.',
+    'auth.passwords_mismatch': 'Paroolid ei ühti.',
     'auth.signout': 'Logi välja',
     'auth.not_signed_in': 'Sa pole sisse logitud',
     'btn.refresh': '⟳ Uuenda',
@@ -647,6 +661,13 @@ const I18N = {
     'auth.link_sent': 'Link sent! Check your inbox.',
     'auth.error_prefix': 'Error: ',
     'auth.back': '← Back to sign in',
+    'auth.new_pwd_intro': 'Enter your new password.',
+    'auth.new_password': 'New password',
+    'auth.new_password_confirm': 'Confirm password',
+    'auth.set_password': 'Set password',
+    'auth.setting_password': 'Saving...',
+    'auth.password_set': 'Password changed! Please sign in.',
+    'auth.passwords_mismatch': 'Passwords do not match.',
     'auth.signout': 'Sign out',
     'auth.not_signed_in': 'You are not signed in',
     'btn.refresh': '⟳ Refresh',
@@ -698,6 +719,13 @@ const I18N = {
     'auth.link_sent': 'Länk skickad! Kontrollera din inkorg.',
     'auth.error_prefix': 'Fel: ',
     'auth.back': '← Tillbaka till inloggning',
+    'auth.new_pwd_intro': 'Ange ditt nya lösenord.',
+    'auth.new_password': 'Nytt lösenord',
+    'auth.new_password_confirm': 'Bekräfta lösenord',
+    'auth.set_password': 'Ange lösenord',
+    'auth.setting_password': 'Sparar...',
+    'auth.password_set': 'Lösenord ändrat! Logga in.',
+    'auth.passwords_mismatch': 'Lösenorden matchar inte.',
     'auth.signout': 'Logga ut',
     'auth.not_signed_in': 'Du är inte inloggad',
     'btn.refresh': '⟳ Uppdatera',
@@ -973,6 +1001,43 @@ document.getElementById('reset-btn').addEventListener('click', async () => {
   }
 });
 
+function showNewPasswordForm() {
+  document.getElementById('login-form').style.display = 'none';
+  document.getElementById('reset-form').style.display = 'none';
+  document.getElementById('new-password-form').style.display = 'block';
+  applyTranslations();
+}
+
+document.getElementById('new-password-btn').addEventListener('click', async () => {
+  const pwd     = document.getElementById('new-password').value;
+  const confirm = document.getElementById('new-password-confirm').value;
+  const msg     = document.getElementById('new-password-msg');
+  const btn     = document.getElementById('new-password-btn');
+  if (pwd !== confirm) {
+    msg.style.color = 'var(--neg)';
+    msg.textContent = t('auth.passwords_mismatch');
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = t('auth.setting_password');
+  const { error } = await sb.auth.updateUser({ password: pwd });
+  btn.disabled = false;
+  btn.textContent = t('auth.set_password');
+  if (error) {
+    msg.style.color = 'var(--neg)';
+    msg.textContent = t('auth.error_prefix') + error.message;
+  } else {
+    msg.style.color = 'var(--pos)';
+    msg.textContent = t('auth.password_set');
+    await sb.auth.signOut();
+    setTimeout(() => {
+      document.getElementById('new-password-form').style.display = 'none';
+      document.getElementById('login-form').style.display = 'block';
+      applyTranslations();
+    }, 2000);
+  }
+});
+
 // ── Init ───────────────────────────────────────────────────────────
 
 async function init() {
@@ -981,6 +1046,7 @@ async function init() {
   else showAuth();
 
   sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'PASSWORD_RECOVERY') showNewPasswordForm();
     if (event === 'SIGNED_IN')  await onLogin(session.user);
     if (event === 'SIGNED_OUT') showAuth();
   });
