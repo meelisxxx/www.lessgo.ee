@@ -148,6 +148,8 @@
 
     .postpone-calendar { display: flex; justify-content: center; }
     .postpone-calendar .flatpickr-calendar.inline { box-shadow: none; margin: 0; }
+    /* Peida flatpickr inline-kalender kuni postpone modal on avatud */
+    .modal-overlay:not(.visible) .flatpickr-calendar { display: none !important; }
 
     select, input[type="text"], input[type="email"], input[type="number"],
     input[type="datetime-local"], input[type="month"], input[type="date"], textarea {
@@ -1024,10 +1026,19 @@ function openPostponeModal(taskId) {
   document.getElementById('postpone-task-id').value = t.id;
   document.getElementById('postpone-modal-sub').textContent = `${clientName(t.client_id)} — ${t.name}`;
   document.getElementById('postpone-current').textContent = fmtDate(t.due_date);
-  if (postponeFp) postponeFp.setDate(t.due_date, false);
+  showModal('postpone-modal');
+  if (!postponeFp) {
+    postponeFp = flatpickr('#postpone-date', {
+      locale: 'et',
+      dateFormat: 'Y-m-d',
+      inline: true,
+      appendTo: document.getElementById('postpone-calendar'),
+      onChange: updatePostponePeriodHint,
+    });
+  }
+  postponeFp.setDate(t.due_date, false);
   document.getElementById('postpone-period-hint').innerHTML = '&nbsp;';
   showError('postpone-modal-error', '');
-  showModal('postpone-modal');
 }
 
 function updatePostponePeriodHint() {
@@ -1243,13 +1254,7 @@ function bindUIEvents() {
   document.getElementById('postpone-save-btn').addEventListener('click', postponeFromInput);
 
   flatpickr('#task-due', { locale: 'et', dateFormat: 'd/m/Y', allowInput: true, disableMobile: true });
-  postponeFp = flatpickr('#postpone-date', {
-    locale: 'et',
-    dateFormat: 'Y-m-d',
-    inline: true,
-    appendTo: document.getElementById('postpone-calendar'),
-    onChange: updatePostponePeriodHint
-  });
+  // Postpone inline kalender — lazy init openPostponeModal()'is, et see ei renderdaks DOMis enne kui modal avaneb
 
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('visible'); });
