@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="searchable-select.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -754,6 +755,9 @@ function populateClientDropdowns() {
     const placeholder = (id === 'filter-client') ? '<option value="">Kõik kliendid</option>' :
                         (id === 'edit-client') ? '' : '<option value="">— Vali —</option>';
     sel.innerHTML = placeholder + opts;
+    const ph = (id === 'filter-client') ? 'Kõik kliendid — otsi…' : 'Otsi klienti…';
+    SkoorSearchable.attach(sel, { placeholder: ph });
+    SkoorSearchable.refresh(sel);
   });
 }
 
@@ -858,7 +862,9 @@ async function stopTimerConfirm() {
 
 // ── Manual entry ────────────────────────────────────────────────
 function openManualModal() {
-  document.getElementById('manual-client').value = '';
+  const mc = document.getElementById('manual-client');
+  mc.value = '';
+  SkoorSearchable.refresh(mc);
   document.getElementById('manual-start').value = '';
   document.getElementById('manual-end').value = '';
   document.getElementById('manual-comment').value = '';
@@ -907,7 +913,9 @@ async function saveManual() {
 
 // ── Adjustment ──────────────────────────────────────────────────
 function openAdjustmentModal() {
-  document.getElementById('adj-client').value = '';
+  const ac = document.getElementById('adj-client');
+  ac.value = '';
+  SkoorSearchable.refresh(ac);
   document.getElementById('adj-period').value = currentPeriod;
   document.getElementById('adj-duration').value = '';
   document.getElementById('adj-comment').value = '';
@@ -958,7 +966,9 @@ function openEditModal(entryId) {
   document.getElementById('edit-type-display').value =
     e.entry_type === 'timer' ? 'Timer' :
     e.entry_type === 'manual' ? 'Manual' : 'Korrigeerimine';
-  document.getElementById('edit-client').value = e.client_id;
+  const ec = document.getElementById('edit-client');
+  ec.value = e.client_id;
+  SkoorSearchable.refresh(ec);
   document.getElementById('edit-period').value = e.period;
   document.getElementById('edit-comment').value = e.comment || '';
 

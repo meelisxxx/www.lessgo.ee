@@ -12,6 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="searchable-select.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/themes/dark.css">
   <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
@@ -668,7 +669,9 @@ async function init() {
 
   // URL'ist tulev client filter
   if (initialClientFilter) {
-    document.getElementById('filter-client').value = initialClientFilter;
+    const fc = document.getElementById('filter-client');
+    fc.value = initialClientFilter;
+    SkoorSearchable.refresh(fc);
     renderTable();
   }
 
@@ -734,6 +737,9 @@ function populateClientDropdowns() {
     const sel = document.getElementById(id);
     const placeholder = (id === 'filter-client') ? '<option value="">Kõik kliendid</option>' : '<option value="">— Vali —</option>';
     sel.innerHTML = placeholder + opts;
+    const ph = (id === 'filter-client') ? 'Kõik kliendid — otsi…' : 'Otsi klienti…';
+    SkoorSearchable.attach(sel, { placeholder: ph });
+    SkoorSearchable.refresh(sel);
   });
 }
 
@@ -895,7 +901,9 @@ function openNewModal() {
   document.getElementById('task-modal-sub').textContent = '';
   document.getElementById('task-id').value = '';
   document.getElementById('task-template-id').value = '';
-  document.getElementById('task-client').value = '';
+  const tcNew = document.getElementById('task-client');
+  tcNew.value = '';
+  SkoorSearchable.refresh(tcNew);
   document.getElementById('task-name').value = '';
   document.getElementById('task-description').value = '';
   document.getElementById('task-period').value = currentPeriod;
@@ -919,7 +927,9 @@ function openEditModal(taskId) {
     : 'Ad-hoc ülesanne.';
   document.getElementById('task-id').value = t.id;
   document.getElementById('task-template-id').value = t.template_id || '';
-  document.getElementById('task-client').value = t.client_id;
+  const tcEdit = document.getElementById('task-client');
+  tcEdit.value = t.client_id;
+  SkoorSearchable.refresh(tcEdit);
   document.getElementById('task-name').value = t.name;
   document.getElementById('task-description').value = t.description || '';
   document.getElementById('task-period').value = t.period;

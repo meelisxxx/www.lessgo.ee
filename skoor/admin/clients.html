@@ -135,6 +135,22 @@
       max-width: 800px;
     }
 
+    /* ── Search bar ── */
+    .clients-search {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .clients-search input[type="search"] {
+      flex: 1;
+      max-width: 360px;
+    }
+    .clients-search-count {
+      font-size: 13px;
+      color: var(--text2);
+    }
+
     /* ── Cards grid ── */
     .clients-grid {
       display: grid;
@@ -433,6 +449,11 @@
       Muudatused salvestatakse automaatselt.
     </p>
 
+    <div class="clients-search">
+      <input type="search" id="clients-search-input" placeholder="Otsi klienti nime järgi…" autocomplete="off">
+      <span class="clients-search-count" id="clients-search-count"></span>
+    </div>
+
     <div class="clients-grid" id="clients-grid"></div>
   </main>
 </div>
@@ -568,14 +589,34 @@ function daysAgo(iso) {
 }
 
 // ── Render ──────────────────────────────────────────────────────
+let clientsSearchQuery = '';
+
 function render() {
   const grid = document.getElementById('clients-grid');
+  const countEl = document.getElementById('clients-search-count');
   if (clients.length === 0) {
     grid.innerHTML = '<div class="empty-msg">Kliente pole. Lisa esimene klient Skoor avalehel.</div>';
+    if (countEl) countEl.textContent = '';
     return;
   }
 
-  grid.innerHTML = clients.map(c => renderClientCard(c)).join('');
+  const q = clientsSearchQuery.trim().toLowerCase();
+  const filtered = q ? clients.filter(c => c.name.toLowerCase().includes(q)) : clients;
+
+  if (countEl) {
+    countEl.textContent = q
+      ? (filtered.length === clients.length
+          ? `${clients.length} klienti`
+          : `${filtered.length} / ${clients.length} klienti`)
+      : `${clients.length} klienti`;
+  }
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '<div class="empty-msg">Otsingule vastavaid kliente ei leitud.</div>';
+    return;
+  }
+
+  grid.innerHTML = filtered.map(c => renderClientCard(c)).join('');
 
   // Bind events
   grid.querySelectorAll('[data-toggle]').forEach(el => {
@@ -930,6 +971,14 @@ async function clearDocs(clientId) {
 // ── UI ──────────────────────────────────────────────────────────
 function bindUIEvents() {
   document.getElementById('logout-btn').addEventListener('click', () => sb.auth.signOut());
+
+  const searchInput = document.getElementById('clients-search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      clientsSearchQuery = e.target.value;
+      render();
+    });
+  }
 }
 
 init();

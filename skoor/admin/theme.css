@@ -76,3 +76,56 @@ html[data-theme="light"] input[type="datetime-local"]::-webkit-calendar-picker-i
     filter: none;
   }
 }
+
+/* ───────────── Searchable select (custom dropdown with filter) ───────────── */
+.searchable-select {
+  position: relative;
+  width: 100%;
+}
+.searchable-select .ss-input {
+  width: 100%;
+  cursor: pointer;
+}
+.searchable-select .ss-input:focus {
+  cursor: text;
+}
+.searchable-select .ss-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 50;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+.searchable-select .ss-dropdown li {
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.searchable-select .ss-dropdown li:hover,
+.searchable-select .ss-dropdown li.active {
+  background: var(--hover-strong);
+}
+.searchable-select .ss-dropdown li.selected {
+  background: var(--bg3);
+  font-weight: 600;
+}
+.searchable-select .ss-dropdown li.empty {
+  color: var(--text3);
+  font-style: italic;
+  cursor: default;
+}
+.searchable-select .ss-dropdown li.empty:hover {
+  background: transparent;
+}

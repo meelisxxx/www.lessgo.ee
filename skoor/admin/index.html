@@ -195,6 +195,7 @@
     }
     .period-bar > label { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
     .period-bar input[type="month"] { width: auto; }
+    .period-bar input[type="search"] { width: 220px; }
     .period-bar select { width: auto; min-width: 160px; }
     .period-bar .spacer { flex: 1; }
 
@@ -466,6 +467,7 @@
       <button class="btn-secondary" id="next-period-btn">Järgmine ›</button>
       <button class="btn-secondary" id="this-period-btn">Käesolev kuu</button>
       <span class="spacer"></span>
+      <input type="search" id="client-search-input" placeholder="Otsi klienti…" autocomplete="off">
       <select id="filter-status">
         <option value="">Kõik staatused</option>
         <option value="red">🔴 Punased</option>
@@ -814,11 +816,13 @@ function render() {
 
   // Filter
   const fStatus = document.getElementById('filter-status').value;
+  const fSearch = (document.getElementById('client-search-input').value || '').trim().toLowerCase();
   let filteredGroups = groups;
   if (fStatus) filteredGroups = groups.filter(g => g.status === fStatus);
+  if (fSearch) filteredGroups = filteredGroups.filter(g => g.client.name.toLowerCase().includes(fSearch));
 
   // Hide clients with 0 tasks (unless filter is set so user explicitly asked)
-  if (!fStatus) filteredGroups = filteredGroups.filter(g => g.tasks.length > 0);
+  if (!fStatus && !fSearch) filteredGroups = filteredGroups.filter(g => g.tasks.length > 0);
 
   // Sort: red → yellow → gray → green; tie-break by name
   const order = { red: 0, yellow: 1, gray: 2, green: 3 };
@@ -1279,6 +1283,7 @@ function bindUIEvents() {
     document.getElementById('period-input').value = currentPeriod; await loadTasks();
   });
   document.getElementById('filter-status').addEventListener('change', render);
+  document.getElementById('client-search-input').addEventListener('input', render);
 
   // Stat tiles act as filter shortcuts (toggle: re-click same tile clears filter)
   document.querySelectorAll('.stat-tile').forEach(tile => {
