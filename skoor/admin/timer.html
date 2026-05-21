@@ -268,6 +268,15 @@
     .entries-table th.sortable:hover { color: var(--text2); }
     .entries-table th.sortable.active { color: var(--accent); }
     .entries-table th .sort-arrow { font-size: 9px; }
+    .entries-table tr.day-sep td {
+      padding: 14px 8px 4px;
+      font-size: 11px;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .entries-table tr.day-sep.first td { padding-top: 2px; }
     .entries-table td { padding: 8px; border-bottom: 1px solid var(--hover-soft); vertical-align: top; }
     .entries-table .col-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
     .entries-table .col-duration { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
@@ -1109,6 +1118,17 @@ function setSort(key) {
   renderEntries();
 }
 
+function entryDayInfo(e) {
+  // Grupeerimise võti + silt päeva eraldusreale (kasutusel ainult AEG-sortimisel)
+  if (e.started_at) {
+    const d = new Date(e.started_at);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const label = new Intl.DateTimeFormat('et-EE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+    return { key, label };
+  }
+  return { key: 'p-' + e.period, label: `${e.period} — korrigeerimised` };
+}
+
 // ── Render entries ──────────────────────────────────────────────
 function renderEntries() {
   const fAdmin = document.getElementById('filter-admin').value;
@@ -1134,7 +1154,19 @@ function renderEntries() {
     return;
   }
 
+  const groupByDay = sortState.key === 'time';
+  let lastDayKey = null;
+
   tbody.innerHTML = filtered.map(e => {
+    let sep = '';
+    if (groupByDay) {
+      const di = entryDayInfo(e);
+      if (di.key !== lastDayKey) {
+        sep = `<tr class="day-sep${lastDayKey === null ? ' first' : ''}"><td colspan="7">${escapeHtml(di.label)}</td></tr>`;
+        lastDayKey = di.key;
+      }
+    }
+
     const timeCell = e.entry_type === 'adjustment'
       ? `${escapeHtml(e.period)}<br><small style="color:var(--text3)">korrigeerimine</small>`
       : (e.started_at
@@ -1144,7 +1176,7 @@ function renderEntries() {
     const isRunning = e.entry_type === 'timer' && !e.ended_at;
     const durationCell = isRunning ? '...' : formatHM(e.duration_minutes);
 
-    return `
+    return sep + `
       <tr>
         <td class="col-time">${timeCell}</td>
         <td>${escapeHtml(adminName(e.admin_id))}</td>
