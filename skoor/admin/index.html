@@ -322,6 +322,8 @@
     .tasks-table tr.overdue td.col-due { color: var(--neg); font-weight: 600; }
     .tasks-table tr.row-active-timer td { background: rgba(16,185,129,0.06); }
     .tasks-table .col-due { white-space: nowrap; font-variant-numeric: tabular-nums; width: 95px; padding-left: 22px; }
+    .tasks-table .col-priority { width: 100px; white-space: nowrap; }
+    .tasks-table .col-status   { width: 124px; white-space: nowrap; }
     .tasks-table .col-actions { white-space: nowrap; text-align: right; width: 1%; }
     .tasks-table .col-name strong { font-weight: 500; }
     .tasks-table .col-name .desc { display: block; font-size: 12px; color: var(--text3); margin-top: 2px; }
@@ -884,8 +886,8 @@ function renderGroup({ client, tasks: cTasks, status }) {
           ${t.notes ? `<span class="desc" style="color:var(--warn)">📌 ${escapeHtml(t.notes)}</span>` : ''}
           ${isAdHoc ? '<span class="pill adhoc" style="margin-top:4px">ad-hoc</span>' : ''}
         </td>
-        <td><span class="pill priority-${t.priority}">${priorityLabel(t.priority)}</span></td>
-        <td><span class="pill status-${t.status}">${statusLabel(t.status)}</span></td>
+        <td class="col-priority"><span class="pill priority-${t.priority}">${priorityLabel(t.priority)}</span></td>
+        <td class="col-status"><span class="pill status-${t.status}">${statusLabel(t.status)}</span></td>
         <td class="col-actions">
           <button class="btn-icon" data-edit="${t.id}" title="Muuda">✏</button>
           <button class="btn-icon postpone" data-postpone="${t.id}" title="Lükka edasi">📅</button>
