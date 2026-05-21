@@ -264,6 +264,44 @@
       padding: 20px 0;
     }
 
+    /* ── Kliendi märkmed ── */
+    .notes-section {
+      margin-bottom: 14px;
+    }
+    .notes-section .notes-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .notes-section .notes-title {
+      font-size: 12px;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 600;
+    }
+    .notes-section .notes-status {
+      font-size: 12px;
+      color: var(--text3);
+      margin-left: auto;
+    }
+    .notes-section textarea {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      padding: 8px 10px;
+      outline: none;
+      width: 100%;
+      resize: vertical;
+      min-height: 44px;
+      transition: border-color 0.2s;
+    }
+    .notes-section textarea:focus { border-color: var(--accent); }
+
     /* ── Doc päring ── */
     .doc-section {
       margin-top: 14px;
@@ -538,7 +576,7 @@ async function init() {
 
 async function loadClients() {
   const { data, error } = await sb.from('clients')
-    .select('id, name, merit_evemee_customer_id, merit_evemee_reg_no, merit_evemee_country_code')
+    .select('id, name, notes, merit_evemee_customer_id, merit_evemee_reg_no, merit_evemee_country_code')
     .order('name');
   if (error) { console.error('clients:', error); return; }
   clients = data || [];
@@ -628,6 +666,9 @@ function render() {
   grid.querySelectorAll('[data-priority-input]').forEach(el => {
     el.addEventListener('change', () => saveOverride(el.dataset.client, el.dataset.template, 'custom_priority', el.value));
   });
+  grid.querySelectorAll('[data-client-notes]').forEach(el => {
+    el.addEventListener('input', () => debounceSaveClientNotes(el.dataset.client, el.value));
+  });
   grid.querySelectorAll('[data-doc-note]').forEach(el => {
     el.addEventListener('input', () => debounceSaveDocNote(el.dataset.client, el.value));
   });
@@ -640,6 +681,34 @@ function render() {
   grid.querySelectorAll('[data-merit-field]').forEach(el => {
     el.addEventListener('input', () => debounceSaveMerit(el.dataset.client, el.dataset.meritField, el.value));
   });
+}
+
+function debounceSaveClientNotes(clientId, value) {
+  const key = `notes|${clientId}`;
+  clearTimeout(saveTimers[key]);
+  const statusEl = document.querySelector(`[data-notes-status="${clientId}"]`);
+  if (statusEl) statusEl.textContent = '…';
+  saveTimers[key] = setTimeout(() => saveClientNotes(clientId, value), 600);
+}
+
+async function saveClientNotes(clientId, rawValue) {
+  const value = (rawValue || '').trim() || null;
+  const { error } = await sb.from('clients')
+    .update({ notes: value })
+    .eq('id', clientId);
+
+  const statusEl = document.querySelector(`[data-notes-status="${clientId}"]`);
+  if (error) {
+    if (statusEl) statusEl.textContent = '';
+    showToast('Viga: ' + error.message, 'error');
+    return;
+  }
+  const c = clients.find(c => c.id === clientId);
+  if (c) c.notes = value;
+  if (statusEl) {
+    statusEl.textContent = '✓ salvestatud';
+    setTimeout(() => { if (statusEl.textContent === '✓ salvestatud') statusEl.textContent = ''; }, 2000);
+  }
 }
 
 function debounceSaveMerit(clientId, field, value) {
@@ -694,11 +763,26 @@ function renderClientCard(client) {
         <div class="client-name">${escapeHtml(client.name)}</div>
         ${rateHtml}
       </div>
+      ${renderNotesSection(client)}
       <div class="templates-list">
         ${rows || '<div class="empty-msg">Mallid puuduvad.</div>'}
       </div>
       ${renderMeritSection(client)}
       ${renderDocSection(client)}
+    </div>
+  `;
+}
+
+function renderNotesSection(client) {
+  return `
+    <div class="notes-section">
+      <div class="notes-header">
+        <span>📝</span>
+        <span class="notes-title">Märkmed</span>
+        <span class="notes-status" data-notes-status="${client.id}"></span>
+      </div>
+      <textarea data-client-notes="1" data-client="${client.id}" rows="2"
+        placeholder="Püsivad märkmed kliendi kohta (ei kustu dokumentide tühjendamisel)">${escapeHtml(client.notes || '')}</textarea>
     </div>
   `;
 }
