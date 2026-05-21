@@ -468,6 +468,8 @@
       <button class="btn-secondary" id="prev-period-btn">‹ Eelmine</button>
       <button class="btn-secondary" id="next-period-btn">Järgmine ›</button>
       <button class="btn-secondary" id="this-period-btn">Käesolev kuu</button>
+      <input type="text" id="day-input" placeholder="📅 Vali päev" autocomplete="off" style="width:130px">
+      <button class="btn-secondary" id="clear-day-btn" style="display:none">Kogu kuu</button>
       <span class="spacer"></span>
       <input type="search" id="client-search-input" placeholder="Otsi klienti…" autocomplete="off">
       <select id="filter-status">
@@ -490,7 +492,7 @@
     <!-- Toolbar -->
     <div class="toolbar">
       <button class="btn-primary" id="new-adhoc-btn">+ Lisa ad-hoc</button>
-      <button class="btn-secondary" id="generate-btn" title="Loo selle kuu instantsid kõikidest aktiivsetest mallide-tellimustest">⚡ Genereeri instantsid</button>
+      <button class="btn-secondary" id="generate-btn" title="Loo selle kuu tähtaegade ülesanded mallide-tellimustest (arvestusperiood = eelmine kuu)">⚡ Genereeri instantsid</button>
       <div class="spacer"></div>
       <span class="modal-info" id="period-info">—</span>
     </div>
@@ -604,6 +606,7 @@ let admins = [];
 let tasks = [];
 let activeTimer = null;
 let currentPeriod = todayPeriod();
+let currentDay = null;   // kui valitud, filtreerime ühe päeva tähtajad; muidu kogu kuu
 
 // URL params
 const urlParams = new URLSearchParams(window.location.search);
@@ -623,6 +626,11 @@ function shiftPeriod(period, delta) {
   const [y, m] = period.split('-').map(Number);
   const d = new Date(y, m - 1 + delta, 1);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function lastDayOfMonth(period) {
+  const [y, m] = period.split('-').map(Number);
+  const d = new Date(y, m, 0).getDate();
+  return `${period}-${String(d).padStart(2,'0')}`;
 }
 function daysBetween(isoDate) {
   const today = new Date(todayDate() + 'T00:00:00');
@@ -741,9 +749,13 @@ async function loadClients() {
   clients = data || [];
 }
 async function loadTasks() {
-  const { data, error } = await sb.from('task_instances')
-    .select('*')
-    .eq('period', currentPeriod);
+  let query = sb.from('task_instances').select('*');
+  if (currentDay) {
+    query = query.eq('due_date', currentDay);
+  } else {
+    query = query.gte('due_date', `${currentPeriod}-01`).lte('due_date', lastDayOfMonth(currentPeriod));
+  }
+  const { data, error } = await query;
   if (error) { console.error('tasks:', error); tasks = []; render(); return; }
   tasks = data || [];
   render();
@@ -837,7 +849,7 @@ function render() {
   if (filteredGroups.length === 0) {
     stack.innerHTML = `<div class="empty-msg">
       ${tasks.length === 0
-        ? 'Selles kuus pole veel ühtegi ülesannet.'
+        ? (currentDay ? 'Sel päeval pole ühtegi tähtaega.' : 'Selles kuus pole ühtegi tähtaega.')
         : 'Ükski klient ei vasta filtrile.'}
       <div class="hint">Vajuta "+ Lisa ad-hoc" või "⚡ Genereeri instantsid".</div>
     </div>`;
@@ -1115,7 +1127,7 @@ function openNewModalForClient(clientId) {
   document.getElementById('task-name').value = '';
   document.getElementById('task-description').value = '';
   document.getElementById('task-period').value = currentPeriod;
-  document.getElementById('task-due').value = isoToDDMMYYYY(defaultDueDate(currentPeriod));
+  document.getElementById('task-due').value = isoToDDMMYYYY(currentDay || `${currentPeriod}-10`);
   document.getElementById('task-priority').value = 'medium';
   document.getElementById('task-status').value = 'todo';
   document.getElementById('task-notes').value = '';
@@ -1232,14 +1244,26 @@ async function deleteTask() {
 
 // ── Generate instances ──────────────────────────────────────────
 async function generateInstances() {
+  // Töölaud näitab tähtaegu kuus currentPeriod. Mallide tähtaeg = arvestusperioodile
+  // järgnev kuu, seega selle kuu tähtaegade tekitamiseks genereerime perioodi kuu−1.
+  const acctPeriod = shiftPeriod(currentPeriod, -1);
   const btn = document.getElementById('generate-btn');
   btn.disabled = true;
-  const { data, error } = await sb.rpc('generate_task_instances_for_period', { p_period: currentPeriod });
+  const { data, error } = await sb.rpc('generate_task_instances_for_period', { p_period: acctPeriod });
   btn.disabled = false;
   if (error) { alert('Viga: ' + error.message); return; }
   const result = Array.isArray(data) ? data[0] : data;
-  alert(`Loodud: ${result?.created ?? 0}\nVahele jäetud: ${result?.skipped ?? 0}`);
+  alert(`Arvestusperiood ${acctPeriod} → tähtajad kuus ${currentPeriod}.\nLoodud: ${result?.created ?? 0}\nVahele jäetud: ${result?.skipped ?? 0}`);
   await loadTasks();
+}
+
+// ── Päevafilter ─────────────────────────────────────────────────
+let dayFp = null;  // flatpickr instance (päevavalija)
+function clearDayFilter() {
+  currentDay = null;
+  if (dayFp) dayFp.clear();
+  const btn = document.getElementById('clear-day-btn');
+  if (btn) btn.style.display = 'none';
 }
 
 // ── Modals ──────────────────────────────────────────────────────
@@ -1270,19 +1294,35 @@ function bindUIEvents() {
   });
 
   document.getElementById('period-input').addEventListener('change', async (e) => {
-    currentPeriod = e.target.value; await loadTasks();
+    currentPeriod = e.target.value; clearDayFilter(false); await loadTasks();
   });
   document.getElementById('prev-period-btn').addEventListener('click', async () => {
     currentPeriod = shiftPeriod(currentPeriod, -1);
-    document.getElementById('period-input').value = currentPeriod; await loadTasks();
+    document.getElementById('period-input').value = currentPeriod; clearDayFilter(false); await loadTasks();
   });
   document.getElementById('next-period-btn').addEventListener('click', async () => {
     currentPeriod = shiftPeriod(currentPeriod, +1);
-    document.getElementById('period-input').value = currentPeriod; await loadTasks();
+    document.getElementById('period-input').value = currentPeriod; clearDayFilter(false); await loadTasks();
   });
   document.getElementById('this-period-btn').addEventListener('click', async () => {
     currentPeriod = todayPeriod();
-    document.getElementById('period-input').value = currentPeriod; await loadTasks();
+    document.getElementById('period-input').value = currentPeriod; clearDayFilter(false); await loadTasks();
+  });
+
+  // Päevavalija (flatpickr) — vali konkreetne tähtajapäev kuu sees
+  dayFp = flatpickr('#day-input', {
+    locale: 'et', dateFormat: 'd/m/Y', disableMobile: true,
+    onChange: async (dates) => {
+      if (!dates[0]) return;
+      currentDay = dateToIso(dates[0]);
+      currentPeriod = periodFromDate(currentDay);
+      document.getElementById('period-input').value = currentPeriod;
+      document.getElementById('clear-day-btn').style.display = '';
+      await loadTasks();
+    }
+  });
+  document.getElementById('clear-day-btn').addEventListener('click', async () => {
+    clearDayFilter(true); await loadTasks();
   });
   document.getElementById('filter-status').addEventListener('change', render);
   document.getElementById('client-search-input').addEventListener('input', render);
