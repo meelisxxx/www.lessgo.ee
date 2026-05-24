@@ -271,11 +271,14 @@
     .entries-table tr.day-sep td {
       padding: 14px 8px 4px;
       font-size: 11px;
-      color: var(--text3);
+      color: var(--text);
+      font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.6px;
       border-bottom: 1px solid var(--border);
+      background: rgba(236, 72, 153, 0.14);
     }
+    .entries-table tr.day-sep .col-duration { text-transform: none; }
     .entries-table tr.day-sep.first td { padding-top: 2px; }
     .entries-table td { padding: 8px; border-bottom: 1px solid var(--hover-soft); vertical-align: top; }
     .entries-table .col-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -1157,12 +1160,27 @@ function renderEntries() {
   const groupByDay = sortState.key === 'time';
   let lastDayKey = null;
 
+  // Päeva töötundide summa (ainult nähtavad kanded, jooksvat timerit ei arvesta)
+  const dayTotals = {};
+  if (groupByDay) {
+    filtered.forEach(e => {
+      const isRunning = e.entry_type === 'timer' && !e.ended_at;
+      if (isRunning) return;
+      const k = entryDayInfo(e).key;
+      dayTotals[k] = (dayTotals[k] || 0) + (e.duration_minutes || 0);
+    });
+  }
+
   tbody.innerHTML = filtered.map(e => {
     let sep = '';
     if (groupByDay) {
       const di = entryDayInfo(e);
       if (di.key !== lastDayKey) {
-        sep = `<tr class="day-sep${lastDayKey === null ? ' first' : ''}"><td colspan="7">${escapeHtml(di.label)}</td></tr>`;
+        sep = `<tr class="day-sep${lastDayKey === null ? ' first' : ''}">`
+            + `<td colspan="4">${escapeHtml(di.label)}</td>`
+            + `<td class="col-duration">${formatHM(dayTotals[di.key] || 0)}</td>`
+            + `<td colspan="2"></td>`
+            + `</tr>`;
         lastDayKey = di.key;
       }
     }
