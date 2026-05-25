@@ -8,6 +8,10 @@
   --hover-soft:   rgba(255,255,255,0.04);
   --hover-mid:    rgba(255,255,255,0.05);
   --hover-strong: rgba(255,255,255,0.08);
+
+  /* Skoor mõõdik-logo värvid — vaikimisi tume teema */
+  --logo-track:  #374151;
+  --logo-needle: #f9fafb;
 }
 
 /* Hele teema — kasutaja valikul */
@@ -31,6 +35,9 @@ html[data-theme="light"] {
   --hover-mid:    rgba(0,0,0,0.05);
   --hover-strong: rgba(0,0,0,0.06);
 
+  --logo-track:  #d1d5db;
+  --logo-needle: #1f2937;
+
   color-scheme: light;
 }
 
@@ -52,6 +59,9 @@ html[data-theme="light"] {
     --hover-soft:   rgba(0,0,0,0.05);
     --hover-mid:    rgba(0,0,0,0.05);
     --hover-strong: rgba(0,0,0,0.06);
+
+    --logo-track:  #d1d5db;
+    --logo-needle: #1f2937;
 
     color-scheme: light;
   }
