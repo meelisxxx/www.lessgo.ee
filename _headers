@@ -1,0 +1,5 @@
+# Hoia Skoori äpi lehed otsingumootoritest väljas (sisemine tööriist, mitte turundussisu).
+# X-Robots-Tag rakendub kõigile /skoor/ alustele teedele, ka tulevastele failidele.
+# NB: robots.txt EI tohi /skoor/ blokeerida — Google peab lehte crawlima, et noindex'i näha.
+/skoor/*
+  X-Robots-Tag: noindex
