@@ -366,6 +366,7 @@
     .pill.status-blocked  { background: rgba(245,158,11,0.18); color: var(--warn); }
     .pill.status-done     { background: rgba(16,185,129,0.15); color: var(--accent); }
     .pill.adhoc           { background: rgba(99,102,241,0.12); color: var(--info); border: 1px solid rgba(99,102,241,0.3); }
+    .pill.carried         { background: rgba(239,68,68,0.14); color: var(--neg); border: 1px solid rgba(239,68,68,0.35); text-transform: none; letter-spacing: 0; }
 
     .group-empty {
       padding: 14px 22px;
@@ -678,6 +679,16 @@ function adminName(userId) {
 }
 function isOverdue(t) { return t.status !== 'done' && t.due_date < todayDate(); }
 function periodFromDate(iso) { return iso.slice(0, 7); }
+const ET_MONTHS = ['jaan','veebr','märts','apr','mai','juuni','juuli','aug','sept','okt','nov','dets'];
+function periodLabel(period) {            // '2026-05' → 'mai 2026'
+  const [y, m] = (period || '').split('-').map(Number);
+  return (ET_MONTHS[m-1] || period) + ' ' + (y || '');
+}
+// Avatud ülesanne (todo/blocked) varasemast kuust, mis kandub praegusesse kuu-vaatesse.
+// Kandub edasi seni, kuni ülesanne saab tehtud. Päeva-vaates carry-over'it ei ole.
+function isCarried(t) {
+  return !currentDay && t.status !== 'done' && t.due_date < `${currentPeriod}-01`;
+}
 function addDaysIso(iso, n) {
   const d = new Date(iso + 'T00:00:00');
   d.setDate(d.getDate() + n);
@@ -750,15 +761,28 @@ async function loadClients() {
   clients = data || [];
 }
 async function loadTasks() {
-  let query = sb.from('task_instances').select('*');
+  // Päeva-vaade: täpne tähtaeg, ilma carry-over'ita.
   if (currentDay) {
-    query = query.eq('due_date', currentDay);
-  } else {
-    query = query.gte('due_date', `${currentPeriod}-01`).lte('due_date', lastDayOfMonth(currentPeriod));
+    const { data, error } = await sb.from('task_instances').select('*').eq('due_date', currentDay);
+    if (error) { console.error('tasks:', error); tasks = []; render(); return; }
+    tasks = data || [];
+    render();
+    return;
   }
-  const { data, error } = await query;
-  if (error) { console.error('tasks:', error); tasks = []; render(); return; }
-  tasks = data || [];
+
+  // Kuu-vaade: selle kuu tähtajad + kõik veel avatud (todo/blocked) tööd varasematest kuudest.
+  const periodStart = `${currentPeriod}-01`;
+  const [curRes, carriedRes] = await Promise.all([
+    sb.from('task_instances').select('*')
+      .gte('due_date', periodStart).lte('due_date', lastDayOfMonth(currentPeriod)),
+    sb.from('task_instances').select('*')
+      .lt('due_date', periodStart).in('status', ['todo', 'blocked'])
+  ]);
+  if (curRes.error || carriedRes.error) {
+    console.error('tasks:', curRes.error || carriedRes.error);
+    tasks = []; render(); return;
+  }
+  tasks = [...(curRes.data || []), ...(carriedRes.data || [])];
   render();
 }
 async function loadActiveTimer() {
@@ -823,11 +847,16 @@ function render() {
     banner.classList.remove('visible');
   }
 
-  // Period info
-  const totalTasks = tasks.length;
-  const doneTasks  = tasks.filter(t => t.status === 'done').length;
+  // Period info — "tehtud" arvestab selle kuu töid; varasemast kuust kandunud tööd näidatakse eraldi.
+  const currentTasks = tasks.filter(t => !isCarried(t));
+  const carriedCount = tasks.length - currentTasks.length;
+  const totalTasks   = currentTasks.length;
+  const doneTasks    = currentTasks.filter(t => t.status === 'done').length;
+  const baseInfo     = totalTasks === 0 ? '' : `${doneTasks} / ${totalTasks} tehtud`;
   document.getElementById('period-info').textContent =
-    totalTasks === 0 ? '' : `${doneTasks} / ${totalTasks} tehtud`;
+    carriedCount > 0
+      ? `${baseInfo}${baseInfo ? ' · ' : ''}${carriedCount} üle tähtaja eelmistest kuudest`
+      : baseInfo;
 
   // Filter
   const fStatus = document.getElementById('filter-status').value;
@@ -862,8 +891,9 @@ function render() {
 }
 
 function renderGroup({ client, tasks: cTasks, status }) {
-  const total = cTasks.length;
-  const done  = cTasks.filter(t => t.status === 'done').length;
+  const currentTasks = cTasks.filter(t => !isCarried(t));   // edenemine = selle kuu tööd
+  const total = currentTasks.length;
+  const done  = currentTasks.filter(t => t.status === 'done').length;
   const pct   = total === 0 ? 0 : Math.round((done / total) * 100);
 
   // Sort tasks within group: status (todo→blocked→done), then priority, then due_date
@@ -898,6 +928,7 @@ function renderGroup({ client, tasks: cTasks, status }) {
           ${t.description ? `<span class="desc">${escapeHtml(t.description)}</span>` : ''}
           ${t.notes ? `<span class="desc" style="color:var(--warn)">📌 ${escapeHtml(t.notes)}</span>` : ''}
           ${isAdHoc ? '<span class="pill adhoc" style="margin-top:4px">ad-hoc</span>' : ''}
+          ${isCarried(t) ? `<span class="pill carried" style="margin-top:4px">⚠ ${escapeHtml(periodLabel(t.period))} · üle tähtaja</span>` : ''}
         </td>
         <td class="col-priority"><span class="pill priority-${t.priority}">${priorityLabel(t.priority)}</span></td>
         <td class="col-status"><span class="pill status-${t.status}">${statusLabel(t.status)}</span></td>
@@ -911,7 +942,7 @@ function renderGroup({ client, tasks: cTasks, status }) {
   }).join('');
 
   let body;
-  if (total === 0) {
+  if (cTasks.length === 0) {
     body = `<div class="group-empty">Selle kuu jaoks pole ülesandeid.</div>`;
   } else {
     body = `<div class="tasks-scroll"><table class="tasks-table"><tbody>${rows}</tbody></table></div>`;
