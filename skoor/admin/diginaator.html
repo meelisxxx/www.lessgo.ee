@@ -148,6 +148,11 @@
     }
     .period-bar input[type="search"] { width: 220px; }
     .period-bar input[type="search"]:focus { border-color: var(--accent); }
+    .basis-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+    .basis-btn { background: var(--bg3); color: var(--text2); padding: 6px 11px; font-size: 12px; border-radius: 0; }
+    .basis-btn + .basis-btn { border-left: 1px solid var(--border); }
+    .basis-btn.active { background: rgba(16,185,129,0.15); color: var(--accent); font-weight: 600; }
+    .basis-btn:hover:not(.active) { background: var(--hover-strong); }
     .period-bar .spacer { flex: 1; }
 
     /* ── Summary stat cards ─────────────────────────────────────── */
@@ -335,7 +340,7 @@
 
   <main>
     <p class="page-intro">
-      Ostuarvete liikumine — DiginaatoR loeb klientide e-postist arved, tunneb need Gemini abil ära ja saadab Meritisse (kinnitamata ostuarvena). Siin on perioodi kõikide klientide üldseis — <strong>vajuta kliendi reale</strong>, et näha tema arvete nimekirja. Staatused: ✅ Meritis, ♻️ duplikaat (Merit lükkas korduvarve tagasi), ⚠️ viga (vajab käsitsi tähelepanu). Periood = töötlemise kuupäev.
+      Ostuarvete liikumine — DiginaatoR loeb klientide e-postist arved, tunneb need Gemini abil ära ja saadab Meritisse (kinnitamata ostuarvena). Siin on perioodi kõikide klientide üldseis — <strong>vajuta kliendi reale</strong>, et näha tema arvete nimekirja. Staatused: ✅ Meritis, ♻️ duplikaat (Merit lükkas korduvarve tagasi), ⚠️ viga (vajab käsitsi tähelepanu). Periood: vali kas <strong>töötlemise</strong> või <strong>arve kuupäev</strong> (nupp ülal) — arve kuupäeva vaade näitab ka selle kuu kuupäevata vead/duplikaadid.
     </p>
 
     <div class="period-bar">
@@ -344,6 +349,10 @@
       <button class="btn-secondary" id="prev-period-btn">‹ Eelmine</button>
       <button class="btn-secondary" id="next-period-btn">Järgmine ›</button>
       <button class="btn-secondary" id="this-month-btn">See kuu</button>
+      <span class="basis-toggle" id="basis-toggle">
+        <button type="button" class="basis-btn active" data-basis="created_at" title="Filtreeri selle järgi, millal DiginaatoR arve töötles">Töötlemise kp</button>
+        <button type="button" class="basis-btn" data-basis="invoice_date" title="Filtreeri arve kuupäeva järgi (raamatupidamise periood)">Arve kp</button>
+      </span>
       <input type="search" id="client-search-input" placeholder="Otsi klienti…" autocomplete="off">
       <span class="spacer"></span>
       <button class="btn-secondary" id="refresh-btn">↻ Värskenda</button>
@@ -366,6 +375,7 @@ let currentUser = null;
 let isAdmin = false;
 let clientsById = {};
 let currentPeriod = todayPeriod();
+let periodBasis = 'created_at';   // 'created_at' = töötlemise kuup. | 'invoice_date' = arve kuup.
 
 const STATUS = {
   pushed:       { label: 'Meritis',   icon: '✅', cls: 'exported' },
@@ -464,11 +474,22 @@ async function loadClients() {
 async function loadInbox() {
   const start = `${currentPeriod}-01`;
   const end   = `${shiftPeriod(currentPeriod, 1)}-01`;
-  const { data, error } = await sb.from('purchase_inbox')
-    .select('id, client_id, vendor_name, vendor_reg_no, invoice_no, invoice_date, total, currency, status, merit_doc_id, drive_pdf_id, drive_original_id, error_message, confidence, received_at, created_at')
-    .gte('created_at', start)
-    .lt('created_at', end)
-    .order('created_at', { ascending: false });
+  const cols = 'id, client_id, vendor_name, vendor_reg_no, invoice_no, invoice_date, total, currency, status, merit_doc_id, drive_pdf_id, drive_original_id, error_message, confidence, received_at, created_at';
+  let q = sb.from('purchase_inbox').select(cols);
+  if (periodBasis === 'invoice_date') {
+    // Arve kuupäeva järgi + selles kuus töödeldud kuupäevata arved (vead/duplikaadid),
+    // et need ei jääks vaatest välja (mark_purchase_failed ei salvesta invoice_date'i).
+    q = q
+      .or(`and(invoice_date.gte.${start},invoice_date.lt.${end}),and(invoice_date.is.null,created_at.gte.${start},created_at.lt.${end})`)
+      .order('invoice_date', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false });
+  } else {
+    q = q
+      .gte('created_at', start)
+      .lt('created_at', end)
+      .order('created_at', { ascending: false });
+  }
+  const { data, error } = await q;
   if (error) { showToast('Arveid ei saanud laadida: ' + error.message, 'error'); return []; }
   return data || [];
 }
@@ -661,6 +682,16 @@ function bindUIEvents() {
   });
   document.getElementById('refresh-btn').addEventListener('click', refresh);
   document.getElementById('client-search-input').addEventListener('input', applyClientFilter);
+
+  document.querySelectorAll('.basis-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (btn.dataset.basis === periodBasis) return;
+      periodBasis = btn.dataset.basis;
+      document.querySelectorAll('.basis-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.basis === periodBasis));
+      await refresh();
+    });
+  });
 }
 
 init();
