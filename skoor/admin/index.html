@@ -978,7 +978,7 @@ function renderTaskRow(t, isSub, openKids) {
         <strong>${isSub ? '<span class="subtask-marker">↳</span>' : ''}${escapeHtml(t.name)}</strong>
         ${t.description ? `<span class="desc">${escapeHtml(t.description)}</span>` : ''}
         ${t.notes ? `<span class="desc" style="color:var(--warn)">📌 ${escapeHtml(t.notes)}</span>` : ''}
-        ${isAdHoc ? '<span class="pill adhoc" style="margin-top:4px">ad-hoc</span>' : ''}
+        ${isAdHoc ? '<span class="pill adhoc" style="margin-top:4px">🤘 käsitsi</span>' : ''}
         ${isCarried(t) ? `<span class="pill carried" style="margin-top:4px">⚠ ${escapeHtml(periodLabel(t.period))} · üle tähtaja</span>` : ''}
       </td>
       <td class="col-priority"><span class="pill priority-${t.priority}">${priorityLabel(t.priority)}</span></td>

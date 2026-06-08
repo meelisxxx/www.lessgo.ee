@@ -839,7 +839,7 @@ function renderTable() {
           <strong>${isSub ? '<span style="color:var(--text3)">↳ </span>' : ''}${escapeHtml(t.name)}</strong>
           ${t.description ? `<span class="desc">${escapeHtml(t.description)}</span>` : ''}
           ${t.notes ? `<span class="desc" style="color:var(--warn)">📌 ${escapeHtml(t.notes)}</span>` : ''}
-          ${isAdHoc ? '<span class="pill adhoc" style="margin-top:4px">ad-hoc</span>' : ''}
+          ${isAdHoc ? '<span class="pill adhoc" style="margin-top:4px">🤘 käsitsi</span>' : ''}
         </td>
         <td><span class="pill priority-${t.priority}">${priorityLabel(t.priority)}</span></td>
         <td><span class="pill status-${t.status}">${statusLabel(t.status)}</span></td>
