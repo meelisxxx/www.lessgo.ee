@@ -314,6 +314,53 @@
       border-color: var(--text2);
     }
 
+    /* Group body: ülesanded vasakul, kliendi märkmed paremal */
+    .group-body { display: flex; align-items: stretch; }
+    .group-tasks { flex: 1; min-width: 0; }
+    .group-notes {
+      width: 300px;
+      flex-shrink: 0;
+      border-left: 1px solid var(--border);
+      background: var(--hover-faint);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+    }
+    .group-notes label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text3);
+      margin-bottom: 6px;
+    }
+    .group-notes .notes-status {
+      margin-left: auto;
+      font-size: 11px;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--text3);
+    }
+    .group-notes textarea {
+      flex: 1;
+      min-height: 64px;
+      resize: vertical;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      line-height: 1.45;
+      padding: 8px 10px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .group-notes textarea:focus { border-color: var(--accent); }
+    .group-notes textarea::placeholder { color: var(--text3); }
+
     /* Task table inside group */
     .tasks-scroll { overflow-x: auto; }
     .tasks-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 720px; }
@@ -429,6 +476,8 @@
       .client-group-header .progress-bar { display: none; }
       .tasks-table { min-width: 0; }
       .tasks-table .col-name { word-break: break-word; }
+      .group-body { flex-direction: column; }
+      .group-notes { width: auto; border-left: none; border-top: 1px solid var(--border); }
     }
   </style>
 </head>
@@ -763,7 +812,7 @@ async function loadAdmins() {
   }));
 }
 async function loadClients() {
-  const { data, error } = await sb.from('clients').select('id, name').order('name');
+  const { data, error } = await sb.from('clients').select('id, name, notes').order('name');
   if (error) { console.error('clients:', error); return; }
   clients = data || [];
 }
@@ -949,7 +998,14 @@ function renderGroup({ client, tasks: cTasks, status }) {
         ` : ''}
         <button class="add-task-btn" data-add-client="${client.id}" title="Lisa ülesanne">+ Lisa</button>
       </div>
-      ${body}
+      <div class="group-body">
+        <div class="group-tasks">${body}</div>
+        <div class="group-notes">
+          <label>📌 Märkmed <span class="notes-status" data-notes-status="${client.id}"></span></label>
+          <textarea data-client-notes data-client="${client.id}" rows="3"
+            placeholder="Püsivad märkmed kliendi kohta… (sünkroonis Kliendid-lehega)">${escapeHtml(client.notes || '')}</textarea>
+        </div>
+      </div>
     </section>
   `;
 }
@@ -1015,6 +1071,34 @@ function bindRowEvents() {
   root.querySelectorAll('tr.row-clickable').forEach(row => {
     row.addEventListener('click', () => openEditModal(row.dataset.id));
   });
+  root.querySelectorAll('[data-client-notes]').forEach(el => {
+    el.addEventListener('input', () => debounceSaveClientNotes(el.dataset.client, el.value));
+  });
+}
+
+// ── Kliendi märkmed (sünkroonis Kliendid-lehega — sama clients.notes väli) ──
+const noteSaveTimers = {};
+function debounceSaveClientNotes(clientId, value) {
+  clearTimeout(noteSaveTimers[clientId]);
+  const statusEl = document.querySelector(`[data-notes-status="${clientId}"]`);
+  if (statusEl) statusEl.textContent = '…';
+  noteSaveTimers[clientId] = setTimeout(() => saveClientNotes(clientId, value), 600);
+}
+async function saveClientNotes(clientId, rawValue) {
+  const value = (rawValue || '').trim() || null;
+  const { error } = await sb.from('clients').update({ notes: value }).eq('id', clientId);
+  const statusEl = document.querySelector(`[data-notes-status="${clientId}"]`);
+  if (error) {
+    if (statusEl) statusEl.textContent = '';
+    alert('Märkme salvestus ebaõnnestus: ' + error.message);
+    return;
+  }
+  const c = clients.find(x => x.id === clientId);
+  if (c) c.notes = value;   // hoia mälus, et re-render säilitaks väärtuse
+  if (statusEl) {
+    statusEl.textContent = '✓ salvestatud';
+    setTimeout(() => { if (statusEl.textContent === '✓ salvestatud') statusEl.textContent = ''; }, 2000);
+  }
 }
 
 // ── Toggle done ─────────────────────────────────────────────────
