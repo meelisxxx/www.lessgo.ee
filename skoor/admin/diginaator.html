@@ -135,7 +135,8 @@
       flex-wrap: wrap;
     }
     .period-bar label { color: var(--text2); font-size: 13px; }
-    .period-bar input[type="month"] {
+    .period-bar input[type="month"],
+    .period-bar input[type="search"] {
       background: var(--bg3);
       border: 1px solid var(--border);
       border-radius: 6px;
@@ -145,6 +146,8 @@
       padding: 6px 10px;
       outline: none;
     }
+    .period-bar input[type="search"] { width: 220px; }
+    .period-bar input[type="search"]:focus { border-color: var(--accent); }
     .period-bar .spacer { flex: 1; }
 
     /* ── Summary stat cards ─────────────────────────────────────── */
@@ -194,16 +197,29 @@
       justify-content: space-between;
       gap: 12px;
       padding: 14px 18px;
-      border-bottom: 1px solid var(--border);
       flex-wrap: wrap;
+      cursor: pointer;
+      user-select: none;
     }
-    .client-block-head .cb-name { font-size: 16px; font-weight: 600; }
+    .client-block-head:hover { background: var(--hover-faint); }
+    .client-block.open .client-block-head { border-bottom: 1px solid var(--border); }
+    .client-block-head .cb-name { font-size: 16px; font-weight: 600; display: flex; align-items: center; }
+    .cb-chevron {
+      display: inline-block;
+      color: var(--text3);
+      font-size: 12px;
+      margin-right: 9px;
+      transition: transform 0.15s;
+    }
+    .client-block.open .cb-chevron { transform: rotate(90deg); }
+    .client-block.hidden { display: none; }
     .cb-counts { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
     .cb-count { font-size: 13px; color: var(--text2); display: inline-flex; align-items: center; gap: 5px; }
     .cb-count strong { color: var(--text); font-weight: 600; }
     .cb-count.sum { color: var(--accent); font-weight: 600; }
 
-    .inv-list { display: flex; flex-direction: column; }
+    .inv-list { display: none; flex-direction: column; }
+    .client-block.open .inv-list { display: flex; }
     .inv-row {
       display: grid;
       grid-template-columns: 110px 1fr 130px 120px 100px 40px;
@@ -319,7 +335,7 @@
 
   <main>
     <p class="page-intro">
-      Ostuarvete liikumine — DiginaatoR loeb klientide e-postist arved, tunneb need Gemini abil ära ja saadab Meritisse (kinnitamata ostuarvena). Siin on perioodi kõikide klientide arvete seis: ✅ Meritis, ♻️ duplikaat (Merit lükkas korduvarve tagasi), ⚠️ viga (vajab käsitsi tähelepanu). Periood = töötlemise kuupäev.
+      Ostuarvete liikumine — DiginaatoR loeb klientide e-postist arved, tunneb need Gemini abil ära ja saadab Meritisse (kinnitamata ostuarvena). Siin on perioodi kõikide klientide üldseis — <strong>vajuta kliendi reale</strong>, et näha tema arvete nimekirja. Staatused: ✅ Meritis, ♻️ duplikaat (Merit lükkas korduvarve tagasi), ⚠️ viga (vajab käsitsi tähelepanu). Periood = töötlemise kuupäev.
     </p>
 
     <div class="period-bar">
@@ -328,6 +344,7 @@
       <button class="btn-secondary" id="prev-period-btn">‹ Eelmine</button>
       <button class="btn-secondary" id="next-period-btn">Järgmine ›</button>
       <button class="btn-secondary" id="this-month-btn">See kuu</button>
+      <input type="search" id="client-search-input" placeholder="Otsi klienti…" autocomplete="off">
       <span class="spacer"></span>
       <button class="btn-secondary" id="refresh-btn">↻ Värskenda</button>
     </div>
@@ -542,7 +559,29 @@ function renderClients(rows) {
     return d !== 0 ? d : clientName(a).localeCompare(clientName(b), 'et');
   });
 
-  container.innerHTML = clientIds.map(cid => renderClientBlock(cid, groups[cid])).join('');
+  container.innerHTML =
+    clientIds.map(cid => renderClientBlock(cid, groups[cid])).join('') +
+    '<div class="empty-msg" id="no-match" style="display:none">Otsingule ei vasta ükski klient.</div>';
+
+  // klikk päisel → ava/sulge arvete nimekiri
+  container.querySelectorAll('.client-block-head').forEach(head => {
+    head.addEventListener('click', () => head.parentElement.classList.toggle('open'));
+  });
+
+  applyClientFilter();
+}
+
+function applyClientFilter() {
+  const q = (document.getElementById('client-search-input').value || '').trim().toLowerCase();
+  const blocks = document.querySelectorAll('#clients-container .client-block');
+  let shown = 0;
+  blocks.forEach(b => {
+    const match = !q || (b.dataset.name || '').includes(q);
+    b.classList.toggle('hidden', !match);
+    if (match) shown++;
+  });
+  const nm = document.getElementById('no-match');
+  if (nm) nm.style.display = (q && shown === 0) ? 'block' : 'none';
 }
 
 function renderClientBlock(clientId, items) {
@@ -560,10 +599,11 @@ function renderClientBlock(clientId, items) {
   if (counts.needs_review) countChips.push(`<span class="cb-count"><strong>${counts.needs_review}</strong> 🔎</span>`);
   if (sum > 0)             countChips.push(`<span class="cb-count sum">${fmtEur(sum)}</span>`);
 
+  const name = clientName(clientId);
   return `
-    <div class="client-block">
+    <div class="client-block" data-name="${escapeHtml(name.toLowerCase())}">
       <div class="client-block-head">
-        <span class="cb-name">${escapeHtml(clientName(clientId))}</span>
+        <span class="cb-name"><span class="cb-chevron">▸</span>${escapeHtml(name)}</span>
         <div class="cb-counts">${countChips.join('')}</div>
       </div>
       <div class="inv-list">
@@ -620,6 +660,7 @@ function bindUIEvents() {
     await refresh();
   });
   document.getElementById('refresh-btn').addEventListener('click', refresh);
+  document.getElementById('client-search-input').addEventListener('input', applyClientFilter);
 }
 
 init();
