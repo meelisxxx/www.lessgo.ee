@@ -198,6 +198,24 @@
     .pill.recur-once      { background: var(--hover-mid); color: var(--text2); border: 1px solid var(--border); }
     .pill.active          { background: rgba(16,185,129,0.15); color: var(--accent); }
     .pill.inactive        { background: var(--hover-mid); color: var(--text3); border: 1px solid var(--border); }
+    .pill.special         { background: rgba(245,158,11,0.15); color: var(--warn); }
+
+    /* Alammallid (pesastatud emamalli alla) */
+    .templates-table tr.is-sub td.col-name { padding-left: 30px; }
+    .sub-marker { color: var(--text3); margin-right: 4px; }
+    .tpl-client-count { display: block; font-size: 12px; color: var(--text3); margin-top: 2px; }
+
+    /* Kliendivalija (erimall) */
+    .clients-picker { border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+    .picker-search { padding: 8px; border-bottom: 1px solid var(--border); }
+    .picker-list { max-height: 220px; overflow-y: auto; padding: 4px; }
+    .picker-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    .picker-item:hover { background: var(--hover-faint); }
+    .picker-item input { width: auto; }
+    .picker-empty { padding: 14px 8px; color: var(--text3); font-size: 13px; text-align: center; }
+    .picker-actions { display: flex; gap: 14px; padding: 7px 10px; border-top: 1px solid var(--border); font-size: 12px; }
+    .picker-actions a { cursor: pointer; }
+    .picker-summary { font-size: 12px; color: var(--text2); margin-top: 6px; }
 
     .empty-msg { text-align: center; color: var(--text2); padding: 40px 0; }
 
@@ -305,9 +323,12 @@
 
   <main>
     <p class="page-intro">
-      Mallid on globaalsed töö-tüübid (Palgaarvestus, TSD, KMD jne). Klientide kaartidel saad iga
-      malli linnukesega aktiveerida — siis genereerib n8n cron iga kuu 1. kuup. selle malli põhjal
-      ülesandeid neile klientidele. Ad-hoc ülesannet pole vaja mallini panna.
+      Mallid on töö-tüübid (Palgaarvestus, TSD, KMD jne). Tavamalle aktiveerid klientide kaartidel
+      linnukesega; <strong>erimallid</strong> on vaid väikesele osale klientidele vajalikud — neid määrad
+      siin mallil oleva kliendivalijaga, nii et need ei risusta iga kliendi kaarti. Erimallile saad valida
+      ka <strong>emamalli</strong> (nt „PS Autokompensatsioon" → „Palgaarvestus"): siis tekib alam-ülesanne
+      ema alla ja emaülesannet ei saa tehtuks märkida enne alam-ülesandeid. n8n cron genereerib ülesanded
+      iga kuu 1. kuupäeval.
     </p>
 
     <div class="toolbar">
@@ -380,6 +401,30 @@
       </div>
     </div>
     <div class="field">
+      <label for="tpl-parent">Emamall (valikuline)</label>
+      <select id="tpl-parent">
+        <option value="">— puudub (ülemtasandi mall) —</option>
+      </select>
+    </div>
+    <div class="field">
+      <div class="toggle-wrap">
+        <div class="toggle" id="tpl-special-toggle"></div>
+        <span class="toggle-label">Erimall — ainult valitud klientidele</span>
+      </div>
+    </div>
+    <div class="field" id="tpl-clients-section" style="display:none">
+      <label>Kliendid, kellele see kehtib</label>
+      <div class="clients-picker">
+        <div class="picker-search"><input type="text" id="tpl-clients-search" placeholder="Otsi klienti…"></div>
+        <div class="picker-list" id="tpl-clients-list"></div>
+        <div class="picker-actions">
+          <a id="tpl-clients-all">Vali kõik</a>
+          <a id="tpl-clients-none">Tühjenda</a>
+        </div>
+      </div>
+      <p class="picker-summary" id="tpl-clients-summary"></p>
+    </div>
+    <div class="field">
       <div class="toggle-wrap">
         <div class="toggle on" id="tpl-active-toggle"></div>
         <span class="toggle-label" id="tpl-active-label">Aktiivne</span>
@@ -405,6 +450,9 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 let currentUser = null;
 let isAdmin = false;
 let templates = [];
+let clients = [];
+let subs = [];                       // client_task_subscriptions (kõik)
+let pickerSelected = new Set();      // valitud kliendi-id-d erimalli modaalis
 
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -434,7 +482,7 @@ async function init() {
     return;
   }
 
-  await loadTemplates();
+  await refresh();
 
   document.getElementById('loading-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
@@ -455,8 +503,31 @@ async function loadTemplates() {
     .order('name');
   if (error) { console.error(error); return; }
   templates = data || [];
+}
+
+async function loadClients() {
+  const { data, error } = await sb.from('clients').select('id, name').order('name');
+  if (error) { console.error(error); return; }
+  clients = data || [];
+}
+
+async function loadSubscriptions() {
+  const { data, error } = await sb.from('client_task_subscriptions').select('client_id, template_id, is_active');
+  if (error) { console.error(error); return; }
+  subs = data || [];
+}
+
+async function refresh() {
+  await Promise.all([loadTemplates(), loadClients(), loadSubscriptions()]);
   render();
 }
+
+// Aktiivselt selle malliga seotud kliendi-id-d
+function activeClientIdsForTemplate(templateId) {
+  return subs.filter(s => s.template_id === templateId && s.is_active).map(s => s.client_id);
+}
+
+const tplSortFn = (a, b) => (a.sort_order - b.sort_order) || a.name.localeCompare(b.name);
 
 function render() {
   const tbody = document.querySelector('#templates-table tbody');
@@ -465,11 +536,38 @@ function render() {
     return;
   }
 
-  tbody.innerHTML = templates.map(t => `
-    <tr class="${t.is_active ? '' : 'row-disabled'}" data-id="${t.id}">
+  // Pesasta alammallid (parent_template_id) emamalli alla
+  const byId = new Map(templates.map(t => [t.id, t]));
+  const childrenByParent = new Map();
+  const topLevel = [];
+  templates.forEach(t => {
+    if (t.parent_template_id && byId.has(t.parent_template_id)) {
+      if (!childrenByParent.has(t.parent_template_id)) childrenByParent.set(t.parent_template_id, []);
+      childrenByParent.get(t.parent_template_id).push(t);
+    } else {
+      topLevel.push(t);
+    }
+  });
+
+  tbody.innerHTML = topLevel.slice().sort(tplSortFn).map(t => {
+    const kids = (childrenByParent.get(t.id) || []).slice().sort(tplSortFn);
+    return renderTemplateRow(t, false) + kids.map(k => renderTemplateRow(k, true)).join('');
+  }).join('');
+
+  tbody.querySelectorAll('tr[data-id]').forEach(row => {
+    row.addEventListener('click', () => openEditModal(row.dataset.id));
+  });
+}
+
+function renderTemplateRow(t, isSub) {
+  const count = activeClientIdsForTemplate(t.id).length;
+  return `
+    <tr class="${t.is_active ? '' : 'row-disabled'} ${isSub ? 'is-sub' : ''}" data-id="${t.id}">
       <td class="col-name">
-        <strong>${escapeHtml(t.name)}</strong>
+        <strong>${isSub ? '<span class="sub-marker">↳</span>' : ''}${escapeHtml(t.name)}</strong>
+        ${t.is_special ? '<span class="pill special" style="margin-left:6px">Erimall</span>' : ''}
         ${t.description ? `<span class="desc">${escapeHtml(t.description)}</span>` : ''}
+        ${t.is_special ? `<span class="tpl-client-count">${count} klient${count === 1 ? '' : 'i'} valitud</span>` : ''}
       </td>
       <td class="col-num">${t.due_day_of_next_month ?? '—'}.</td>
       <td><span class="pill priority-${t.default_priority}">${priorityLabel(t.default_priority)}</span></td>
@@ -478,11 +576,46 @@ function render() {
       <td><span class="pill ${t.is_active ? 'active' : 'inactive'}">${t.is_active ? 'Jah' : 'Ei'}</span></td>
       <td class="col-actions"><button class="btn-icon" data-edit="${t.id}" title="Muuda">✏</button></td>
     </tr>
-  `).join('');
+  `;
+}
 
-  tbody.querySelectorAll('tr[data-id]').forEach(row => {
-    row.addEventListener('click', () => openEditModal(row.dataset.id));
-  });
+// ── Emamalli valik + erimalli kliendivalija ─────────────────────
+function populateParentSelect(currentId, selectedParentId) {
+  const sel = document.getElementById('tpl-parent');
+  // Võimalikud emamallid: kõik v.a. see ise ja v.a. need, millel endal juba on emamall (hoiame 1 taset)
+  const opts = templates
+    .filter(t => t.id !== currentId && !t.parent_template_id)
+    .sort(tplSortFn);
+  sel.innerHTML = '<option value="">— puudub (ülemtasandi mall) —</option>' +
+    opts.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+  sel.value = selectedParentId || '';
+}
+
+function setSpecialToggle(on) {
+  const t = document.getElementById('tpl-special-toggle');
+  t.classList.toggle('on', on);
+  document.getElementById('tpl-clients-section').style.display = on ? '' : 'none';
+  if (on) renderClientPicker();
+}
+
+function isSpecialOn() {
+  return document.getElementById('tpl-special-toggle').classList.contains('on');
+}
+
+function renderClientPicker() {
+  const q = (document.getElementById('tpl-clients-search').value || '').trim().toLowerCase();
+  const list = document.getElementById('tpl-clients-list');
+  const shown = clients.filter(c => !q || c.name.toLowerCase().includes(q));
+  list.innerHTML = shown.length === 0
+    ? '<div class="picker-empty">Ühtegi klienti ei leitud.</div>'
+    : shown.map(c => `
+        <label class="picker-item">
+          <input type="checkbox" data-client="${c.id}" ${pickerSelected.has(c.id) ? 'checked' : ''}>
+          <span>${escapeHtml(c.name)}</span>
+        </label>
+      `).join('');
+  document.getElementById('tpl-clients-summary').textContent =
+    `${pickerSelected.size} klienti valitud${clients.length ? ` (${clients.length}-st)` : ''}`;
 }
 
 // ── Modal ───────────────────────────────────────────────────────
@@ -497,6 +630,10 @@ function openNewModal() {
   document.getElementById('tpl-recurrence').value = 'monthly';
   document.getElementById('tpl-sort').value = 100;
   setActiveToggle(true);
+  populateParentSelect(null, null);
+  pickerSelected = new Set();
+  document.getElementById('tpl-clients-search').value = '';
+  setSpecialToggle(false);
   document.getElementById('tpl-delete-btn').style.display = 'none';
   document.getElementById('tpl-modal-error').textContent = '';
   showModal('tpl-modal');
@@ -516,6 +653,10 @@ function openEditModal(id) {
   document.getElementById('tpl-recurrence').value = t.recurrence;
   document.getElementById('tpl-sort').value = t.sort_order;
   setActiveToggle(t.is_active);
+  populateParentSelect(t.id, t.parent_template_id);
+  pickerSelected = new Set(activeClientIdsForTemplate(t.id));
+  document.getElementById('tpl-clients-search').value = '';
+  setSpecialToggle(!!t.is_special);
   document.getElementById('tpl-delete-btn').style.display = '';
   document.getElementById('tpl-modal-error').textContent = '';
   showModal('tpl-modal');
@@ -541,11 +682,19 @@ async function saveTemplate() {
   const recurrence  = document.getElementById('tpl-recurrence').value;
   const sortOrder   = parseInt(document.getElementById('tpl-sort').value, 10);
   const isActive    = isActiveOn();
+  const parentId    = document.getElementById('tpl-parent').value || null;
+  const isSpecial   = isSpecialOn();
 
   if (!name) return showError('Sisesta nimi.');
   const dueDay = dueDayRaw === '' ? null : parseInt(dueDayRaw, 10);
   if (dueDay !== null && (isNaN(dueDay) || dueDay < 1 || dueDay > 31)) return showError('Tähtaja päev peab olema 1–31.');
   if (isNaN(sortOrder)) return showError('Sort peab olema arv.');
+
+  // Hoia 1 tase: mall, millel on alammalle, ei saa ise olla alammall
+  if (id && parentId && templates.some(t => t.parent_template_id === id)) {
+    return showError('See mall on ise emamall (tal on alammalle) — ta ei saa olla teise malli alammall.');
+  }
+  if (parentId && parentId === id) return showError('Mall ei saa olla iseenda emamall.');
 
   const payload = {
     name, description,
@@ -553,26 +702,55 @@ async function saveTemplate() {
     due_day_of_next_month: dueDay,
     recurrence,
     sort_order: sortOrder,
-    is_active: isActive
+    is_active: isActive,
+    parent_template_id: parentId,
+    is_special: isSpecial
   };
 
   const btn = document.getElementById('tpl-save-btn');
   btn.disabled = true;
 
-  let error;
-  if (id) {
-    ({ error } = await sb.from('task_templates').update(payload).eq('id', id));
-  } else {
-    payload.created_by = currentUser.id;
-    ({ error } = await sb.from('task_templates').insert(payload));
+  try {
+    let savedId = id;
+    if (id) {
+      const { error } = await sb.from('task_templates').update(payload).eq('id', id);
+      if (error) throw error;
+    } else {
+      payload.created_by = currentUser.id;
+      const { data, error } = await sb.from('task_templates').insert(payload).select('id').single();
+      if (error) throw error;
+      savedId = data.id;
+    }
+
+    // Erimall → sünkroni kliendivalik client_task_subscriptions tabelisse
+    if (isSpecial) await syncSubscriptions(savedId);
+
+    hideModal('tpl-modal');
+    showToast(id ? 'Mall uuendatud' : 'Mall lisatud');
+    await refresh();
+  } catch (e) {
+    showError('Viga: ' + (e.message || e));
+  } finally {
+    btn.disabled = false;
   }
-  btn.disabled = false;
+}
 
-  if (error) return showError('Viga: ' + error.message);
+// Sünkroni erimalli kliendivalik: lisa puuduvad, eemalda mahavõetud
+async function syncSubscriptions(templateId) {
+  const current  = new Set(activeClientIdsForTemplate(templateId));
+  const toAdd    = [...pickerSelected].filter(c => !current.has(c));
+  const toRemove = [...current].filter(c => !pickerSelected.has(c));
 
-  hideModal('tpl-modal');
-  showToast(id ? 'Mall uuendatud' : 'Mall lisatud');
-  await loadTemplates();
+  if (toAdd.length) {
+    const rows = toAdd.map(client_id => ({ client_id, template_id: templateId, is_active: true }));
+    const { error } = await sb.from('client_task_subscriptions').upsert(rows, { onConflict: 'client_id,template_id' });
+    if (error) throw error;
+  }
+  if (toRemove.length) {
+    const { error } = await sb.from('client_task_subscriptions')
+      .delete().eq('template_id', templateId).in('client_id', toRemove);
+    if (error) throw error;
+  }
 }
 
 async function deleteTemplate() {
@@ -589,7 +767,7 @@ async function deleteTemplate() {
   if (error) return showError('Viga: ' + error.message);
   hideModal('tpl-modal');
   showToast('Mall kustutatud');
-  await loadTemplates();
+  await refresh();
 }
 
 function showError(msg) { document.getElementById('tpl-modal-error').textContent = msg; }
@@ -602,6 +780,24 @@ function bindUIEvents() {
   document.getElementById('tpl-save-btn').addEventListener('click', saveTemplate);
   document.getElementById('tpl-delete-btn').addEventListener('click', deleteTemplate);
   document.getElementById('tpl-active-toggle').addEventListener('click', () => setActiveToggle(!isActiveOn()));
+  document.getElementById('tpl-special-toggle').addEventListener('click', () => setSpecialToggle(!isSpecialOn()));
+  document.getElementById('tpl-clients-search').addEventListener('input', renderClientPicker);
+  document.getElementById('tpl-clients-list').addEventListener('change', (e) => {
+    const cb = e.target.closest('input[data-client]');
+    if (!cb) return;
+    if (cb.checked) pickerSelected.add(cb.dataset.client);
+    else pickerSelected.delete(cb.dataset.client);
+    document.getElementById('tpl-clients-summary').textContent =
+      `${pickerSelected.size} klienti valitud${clients.length ? ` (${clients.length}-st)` : ''}`;
+  });
+  document.getElementById('tpl-clients-all').addEventListener('click', () => {
+    clients.forEach(c => pickerSelected.add(c.id));
+    renderClientPicker();
+  });
+  document.getElementById('tpl-clients-none').addEventListener('click', () => {
+    pickerSelected.clear();
+    renderClientPicker();
+  });
 
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
     overlay.addEventListener('click', (e) => {

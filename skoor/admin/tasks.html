@@ -266,6 +266,8 @@
     }
     .check-btn:hover { border-color: var(--accent); }
     .check-btn.checked { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .check-btn.locked { border-style: dashed; border-color: var(--text3); color: var(--text3); opacity: 0.55; cursor: not-allowed; }
+    .check-btn.locked:hover { border-color: var(--text3); }
 
     .pill {
       display: inline-block;
@@ -801,10 +803,20 @@ function renderTable() {
     return;
   }
 
+  // Mitu alam-ülesannet on ema kohta tegemata (ema lukus)
+  const openKidsByParent = {};
+  tasks.forEach(k => {
+    if (k.parent_instance_id && k.status !== 'done') {
+      openKidsByParent[k.parent_instance_id] = (openKidsByParent[k.parent_instance_id] || 0) + 1;
+    }
+  });
+
   tbody.innerHTML = filtered.map(t => {
     const overdue = isOverdue(t);
     const isDone = t.status === 'done';
     const isAdHoc = !t.template_id;
+    const isSub = !!t.parent_instance_id;
+    const locked = !isDone && openKidsByParent[t.id] > 0;
     const isRunningHere = activeTimer && activeTimer.task_id === t.id;
     const completedTxt = t.completed_at
       ? `${fmtDateTime(t.completed_at)}<br><small style="color:var(--text3)">${escapeHtml(adminName(t.completed_by))}</small>`
@@ -817,14 +829,14 @@ function renderTable() {
     return `
       <tr class="${isDone ? 'done' : ''} ${overdue ? 'overdue' : ''} ${isRunningHere ? 'row-active-timer' : ''} row-clickable" data-id="${t.id}">
         <td class="col-check">
-          <button class="check-btn ${isDone ? 'checked' : ''}" data-toggle="${t.id}" title="${isDone ? 'Märgi tegemata' : 'Märgi tehtud'}">
+          <button class="check-btn ${isDone ? 'checked' : ''} ${locked ? 'locked' : ''}" data-toggle="${t.id}" title="${locked ? 'Lõpeta esmalt alam-ülesanded' : (isDone ? 'Märgi tegemata' : 'Märgi tehtud')}">
             ${isDone ? '✓' : ''}
           </button>
         </td>
         <td class="col-due">${fmtDate(t.due_date)}</td>
         <td>${escapeHtml(clientName(t.client_id))}</td>
         <td class="col-name">
-          <strong>${escapeHtml(t.name)}</strong>
+          <strong>${isSub ? '<span style="color:var(--text3)">↳ </span>' : ''}${escapeHtml(t.name)}</strong>
           ${t.description ? `<span class="desc">${escapeHtml(t.description)}</span>` : ''}
           ${t.notes ? `<span class="desc" style="color:var(--warn)">📌 ${escapeHtml(t.notes)}</span>` : ''}
           ${isAdHoc ? '<span class="pill adhoc" style="margin-top:4px">ad-hoc</span>' : ''}
@@ -883,6 +895,16 @@ async function toggleDone(taskId) {
   if (!t) return;
 
   const newStatus = t.status === 'done' ? 'todo' : 'done';
+
+  // Range sõltuvus: emaülesannet ei saa tehtuks märkida enne alam-ülesandeid
+  if (newStatus === 'done') {
+    const openKids = tasks.filter(k => k.parent_instance_id === taskId && k.status !== 'done');
+    if (openKids.length) {
+      alert(`„${t.name}" ei saa veel tehtuks märkida.\n\nEsmalt lõpeta alam-ülesanne(d):\n• ${openKids.map(k => k.name).join('\n• ')}`);
+      return;
+    }
+  }
+
   const update = {
     status: newStatus,
     completed_at: newStatus === 'done' ? new Date().toISOString() : null,

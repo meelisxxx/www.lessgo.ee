@@ -367,6 +367,13 @@
     .pill.status-done     { background: rgba(16,185,129,0.15); color: var(--accent); }
     .pill.adhoc           { background: rgba(99,102,241,0.12); color: var(--info); border: 1px solid rgba(99,102,241,0.3); }
     .pill.carried         { background: rgba(239,68,68,0.14); color: var(--neg); border: 1px solid rgba(239,68,68,0.35); text-transform: none; letter-spacing: 0; }
+    .pill.subtask-pill    { background: var(--hover-mid); color: var(--text2); border: 1px solid var(--border); text-transform: none; letter-spacing: 0; }
+
+    /* Alam-ülesanded (pesastatud ema alla) */
+    .tasks-table tr.subtask td.col-check { padding-left: 34px; }
+    .subtask-marker { color: var(--text3); margin-right: 4px; }
+    .check-btn.locked { border-style: dashed; border-color: var(--text3); color: var(--text3); opacity: 0.55; cursor: not-allowed; }
+    .check-btn.locked:hover { border-color: var(--text3); }
 
     .group-empty {
       padding: 14px 22px;
@@ -899,46 +906,29 @@ function renderGroup({ client, tasks: cTasks, status }) {
   // Sort tasks within group: status (todo→blocked→done), then priority, then due_date
   const priorityOrder = { high: 0, medium: 1, low: 2 };
   const statusOrder   = { todo: 0, blocked: 1, done: 2 };
-  const sortedTasks = cTasks.slice().sort((a, b) => {
+  const sortFn = (a, b) => {
     if (statusOrder[a.status] !== statusOrder[b.status]) return statusOrder[a.status] - statusOrder[b.status];
     if (priorityOrder[a.priority] !== priorityOrder[b.priority]) return priorityOrder[a.priority] - priorityOrder[b.priority];
     return a.due_date.localeCompare(b.due_date);
+  };
+
+  // Pesasta alam-ülesanded (parent_instance_id) ema alla; orphan-lapsed jäävad ülemtasandile
+  const byId = new Map(cTasks.map(t => [t.id, t]));
+  const kidsByParent = new Map();
+  const topLevel = [];
+  cTasks.forEach(t => {
+    if (t.parent_instance_id && byId.has(t.parent_instance_id)) {
+      if (!kidsByParent.has(t.parent_instance_id)) kidsByParent.set(t.parent_instance_id, []);
+      kidsByParent.get(t.parent_instance_id).push(t);
+    } else {
+      topLevel.push(t);
+    }
   });
 
-  const today = todayDate();
-  const rows = sortedTasks.map(t => {
-    const overdue = isOverdue(t);
-    const isDone = t.status === 'done';
-    const isAdHoc = !t.template_id;
-    const isRunningHere = activeTimer && activeTimer.task_id === t.id;
-    const timerBtn = isRunningHere
-      ? `<button class="btn-icon timer-stop" data-timer-stop="${t.id}" title="Peata timer">⏹</button>`
-      : `<button class="btn-icon timer-start" data-timer-start="${t.id}" title="Käivita timer">▶</button>`;
-
-    return `
-      <tr class="${isDone ? 'done' : ''} ${overdue ? 'overdue' : ''} ${isRunningHere ? 'row-active-timer' : ''} row-clickable" data-id="${t.id}">
-        <td class="col-check">
-          <button class="check-btn ${isDone ? 'checked' : ''}" data-toggle="${t.id}" title="${isDone ? 'Märgi tegemata' : 'Märgi tehtud'}">
-            ${isDone ? '✓' : ''}
-          </button>
-        </td>
-        <td class="col-due">${fmtDate(t.due_date)}</td>
-        <td class="col-name">
-          <strong>${escapeHtml(t.name)}</strong>
-          ${t.description ? `<span class="desc">${escapeHtml(t.description)}</span>` : ''}
-          ${t.notes ? `<span class="desc" style="color:var(--warn)">📌 ${escapeHtml(t.notes)}</span>` : ''}
-          ${isAdHoc ? '<span class="pill adhoc" style="margin-top:4px">ad-hoc</span>' : ''}
-          ${isCarried(t) ? `<span class="pill carried" style="margin-top:4px">⚠ ${escapeHtml(periodLabel(t.period))} · üle tähtaja</span>` : ''}
-        </td>
-        <td class="col-priority"><span class="pill priority-${t.priority}">${priorityLabel(t.priority)}</span></td>
-        <td class="col-status"><span class="pill status-${t.status}">${statusLabel(t.status)}</span></td>
-        <td class="col-actions">
-          <button class="btn-icon" data-edit="${t.id}" title="Muuda">✏</button>
-          <button class="btn-icon postpone" data-postpone="${t.id}" title="Lükka edasi">📅</button>
-          ${timerBtn}
-        </td>
-      </tr>
-    `;
+  const rows = topLevel.slice().sort(sortFn).map(parent => {
+    const kids = (kidsByParent.get(parent.id) || []).slice().sort(sortFn);
+    const openKids = kids.filter(k => k.status !== 'done').length;
+    return renderTaskRow(parent, false, openKids) + kids.map(k => renderTaskRow(k, true, 0)).join('');
   }).join('');
 
   let body;
@@ -961,6 +951,44 @@ function renderGroup({ client, tasks: cTasks, status }) {
       </div>
       ${body}
     </section>
+  `;
+}
+
+// Üks ülesande rida. isSub = alam-ülesanne (taane); openKids = mitu alam-ülesannet tegemata (ema lukus).
+function renderTaskRow(t, isSub, openKids) {
+  const overdue = isOverdue(t);
+  const isDone = t.status === 'done';
+  const isAdHoc = !t.template_id;
+  const isRunningHere = activeTimer && activeTimer.task_id === t.id;
+  const locked = !isDone && openKids > 0;
+  const timerBtn = isRunningHere
+    ? `<button class="btn-icon timer-stop" data-timer-stop="${t.id}" title="Peata timer">⏹</button>`
+    : `<button class="btn-icon timer-start" data-timer-start="${t.id}" title="Käivita timer">▶</button>`;
+  const checkTitle = locked ? 'Lõpeta esmalt alam-ülesanded' : (isDone ? 'Märgi tegemata' : 'Märgi tehtud');
+
+  return `
+    <tr class="${isDone ? 'done' : ''} ${overdue ? 'overdue' : ''} ${isRunningHere ? 'row-active-timer' : ''} ${isSub ? 'subtask' : ''} row-clickable" data-id="${t.id}">
+      <td class="col-check">
+        <button class="check-btn ${isDone ? 'checked' : ''} ${locked ? 'locked' : ''}" data-toggle="${t.id}" title="${checkTitle}">
+          ${isDone ? '✓' : ''}
+        </button>
+      </td>
+      <td class="col-due">${fmtDate(t.due_date)}</td>
+      <td class="col-name">
+        <strong>${isSub ? '<span class="subtask-marker">↳</span>' : ''}${escapeHtml(t.name)}</strong>
+        ${t.description ? `<span class="desc">${escapeHtml(t.description)}</span>` : ''}
+        ${t.notes ? `<span class="desc" style="color:var(--warn)">📌 ${escapeHtml(t.notes)}</span>` : ''}
+        ${isAdHoc ? '<span class="pill adhoc" style="margin-top:4px">ad-hoc</span>' : ''}
+        ${isCarried(t) ? `<span class="pill carried" style="margin-top:4px">⚠ ${escapeHtml(periodLabel(t.period))} · üle tähtaja</span>` : ''}
+      </td>
+      <td class="col-priority"><span class="pill priority-${t.priority}">${priorityLabel(t.priority)}</span></td>
+      <td class="col-status"><span class="pill status-${t.status}">${statusLabel(t.status)}</span></td>
+      <td class="col-actions">
+        <button class="btn-icon" data-edit="${t.id}" title="Muuda">✏</button>
+        <button class="btn-icon postpone" data-postpone="${t.id}" title="Lükka edasi">📅</button>
+        ${timerBtn}
+      </td>
+    </tr>
   `;
 }
 
@@ -994,6 +1022,16 @@ async function toggleDone(taskId) {
   const t = tasks.find(x => x.id === taskId);
   if (!t) return;
   const newStatus = t.status === 'done' ? 'todo' : 'done';
+
+  // Range sõltuvus: emaülesannet ei saa tehtuks märkida enne alam-ülesandeid
+  if (newStatus === 'done') {
+    const openKids = tasks.filter(k => k.parent_instance_id === taskId && k.status !== 'done');
+    if (openKids.length) {
+      alert(`„${t.name}" ei saa veel tehtuks märkida.\n\nEsmalt lõpeta alam-ülesanne(d):\n• ${openKids.map(k => k.name).join('\n• ')}`);
+      return;
+    }
+  }
+
   const update = {
     status: newStatus,
     completed_at: newStatus === 'done' ? new Date().toISOString() : null,

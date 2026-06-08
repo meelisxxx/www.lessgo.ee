@@ -756,7 +756,8 @@ function renderClientCard(client) {
     rateHtml = `<span class="client-rate">${fmtEur(rate.rate_eur)}/h</span>`;
   }
 
-  const rows = templates.map(tpl => renderTemplateRow(client.id, tpl)).join('');
+  // Erimallid (is_special) ei kuvata kliendikaardil — neid määratakse Mallid-lehe kliendivalijaga
+  const rows = templates.filter(tpl => !tpl.is_special).map(tpl => renderTemplateRow(client.id, tpl)).join('');
 
   return `
     <div class="client-card">
