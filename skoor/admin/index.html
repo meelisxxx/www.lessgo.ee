@@ -500,7 +500,7 @@
 
     <!-- Toolbar -->
     <div class="toolbar">
-      <button class="btn-primary" id="new-adhoc-btn">+ Lisa ad-hoc</button>
+      <button class="btn-primary" id="new-adhoc-btn">+ Lisa ülesanne</button>
       <button class="btn-secondary" id="generate-btn" title="Loo selle kuu tähtaegade ülesanded mallide-tellimustest (arvestusperiood = eelmine kuu)">⚡ Genereeri instantsid</button>
       <div class="spacer"></div>
       <span class="modal-info" id="period-info">—</span>
@@ -514,7 +514,7 @@
 <!-- Edit / new task modal (kopeeritud tasks.html-ist) -->
 <div class="modal-overlay" id="task-modal">
   <div class="modal">
-    <h3 id="task-modal-title">Lisa ad-hoc ülesanne</h3>
+    <h3 id="task-modal-title">Lisa ülesanne</h3>
     <p class="modal-sub" id="task-modal-sub">&nbsp;</p>
     <input type="hidden" id="task-id">
     <input type="hidden" id="task-template-id">
@@ -888,7 +888,7 @@ function render() {
       ${tasks.length === 0
         ? (currentDay ? 'Sel päeval pole ühtegi tähtaega.' : 'Selles kuus pole ühtegi tähtaega.')
         : 'Ükski klient ei vasta filtrile.'}
-      <div class="hint">Vajuta "+ Lisa ad-hoc" või "⚡ Genereeri instantsid".</div>
+      <div class="hint">Vajuta "+ Lisa ülesanne" või "⚡ Genereeri instantsid".</div>
     </div>`;
     return;
   }
@@ -947,7 +947,7 @@ function renderGroup({ client, tasks: cTasks, status }) {
           <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
           <span class="progress-text">${done} / ${total} tehtud</span>
         ` : ''}
-        <button class="add-task-btn" data-add-client="${client.id}" title="Lisa ad-hoc ülesanne">+ Lisa</button>
+        <button class="add-task-btn" data-add-client="${client.id}" title="Lisa ülesanne">+ Lisa</button>
       </div>
       ${body}
     </section>
@@ -1189,7 +1189,7 @@ async function applyPostpone(taskId, newDueIso) {
 function openNewModal() { openNewModalForClient(''); }
 
 function openNewModalForClient(clientId) {
-  document.getElementById('task-modal-title').textContent = 'Lisa ad-hoc ülesanne';
+  document.getElementById('task-modal-title').textContent = 'Lisa ülesanne';
   document.getElementById('task-modal-sub').textContent = '';
   document.getElementById('task-id').value = '';
   document.getElementById('task-template-id').value = '';

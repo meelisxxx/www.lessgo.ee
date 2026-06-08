@@ -389,7 +389,7 @@
 
     <!-- Toolbar -->
     <div class="toolbar">
-      <button class="btn-primary" id="new-adhoc-btn">+ Lisa ad-hoc</button>
+      <button class="btn-primary" id="new-adhoc-btn">+ Lisa ülesanne</button>
       <button class="btn-secondary" id="generate-btn" title="Loo selle kuu instantsid kõikidest aktiivsetest mallide-tellimustest">⚡ Genereeri instantsid</button>
       <div class="spacer"></div>
       <span class="modal-info" id="period-info">—</span>
@@ -439,7 +439,7 @@
 <!-- Edit / new task modal -->
 <div class="modal-overlay" id="task-modal">
   <div class="modal">
-    <h3 id="task-modal-title">Lisa ad-hoc ülesanne</h3>
+    <h3 id="task-modal-title">Lisa ülesanne</h3>
     <p class="modal-sub" id="task-modal-sub">&nbsp;</p>
     <input type="hidden" id="task-id">
     <input type="hidden" id="task-template-id">
@@ -796,7 +796,7 @@ function renderTable() {
     const empty = tasks.length === 0
       ? `<tr><td colspan="8"><div class="empty-msg">
            Selles kuus pole veel ülesandeid.
-           <div class="hint">Lisa ad-hoc või käivita "⚡ Genereeri instantsid" (kui kliendid on mallidega seotud).</div>
+           <div class="hint">Vajuta "+ Lisa ülesanne" või käivita "⚡ Genereeri instantsid" (kui kliendid on mallidega seotud).</div>
          </div></td></tr>`
       : `<tr><td colspan="8"><div class="empty-msg">Filtrile ei vasta ükski ülesanne.</div></td></tr>`;
     tbody.innerHTML = empty;
@@ -920,7 +920,7 @@ async function toggleDone(taskId) {
 
 // ── New / Edit modal ────────────────────────────────────────────
 function openNewModal() {
-  document.getElementById('task-modal-title').textContent = 'Lisa ad-hoc ülesanne';
+  document.getElementById('task-modal-title').textContent = 'Lisa ülesanne';
   document.getElementById('task-modal-sub').textContent = '';
   document.getElementById('task-id').value = '';
   document.getElementById('task-template-id').value = '';
