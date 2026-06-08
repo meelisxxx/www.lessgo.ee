@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Skoor Admin — DiginaatoR</title>
+  <script>(function(){try{const t=localStorage.getItem('skoor-theme')||'system';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="timer-banner.css">
+  <script src="timer-banner.js" defer></script>
+  <link rel="icon" type="image/svg+xml" href="../skoor-favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #111827;
+      --bg2:      #1f2937;
+      --bg3:      #374151;
+      --border:   rgba(255,255,255,0.08);
+      --text:     #f9fafb;
+      --text2:    #9ca3af;
+      --text3:    #6b7280;
+      --accent:   #10b981;
+      --pos:      #10b981;
+      --neg:      #ef4444;
+      --warn:     #f59e0b;
+      --info:     #818cf8;
+      --radius:   12px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { opacity: 0.8; }
+
+    #loading-screen, #denied-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      text-align: center;
+    }
+    #denied-screen h2 { color: var(--neg); margin-bottom: 12px; }
+    #denied-screen p { color: var(--text2); margin-bottom: 24px; }
+
+    #app { display: none; flex-direction: column; min-height: 100vh; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-logo { width: 36px; height: 36px; border-radius: 50%; }
+    .header-title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
+    .header-title .badge {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-left: 8px;
+      vertical-align: middle;
+      letter-spacing: 1px;
+    }
+    .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    .nav-link {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text2);
+      font-size: 13px;
+    }
+    .nav-link:hover { color: var(--text); border-color: var(--text2); opacity: 1; }
+    .nav-link.active { color: var(--text); border-color: var(--accent); background: rgba(16,185,129,0.08); }
+
+    button {
+      cursor: pointer;
+      font-family: inherit;
+      border: none;
+      border-radius: 8px;
+      transition: opacity 0.2s, background 0.2s, transform 0.1s;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary {
+      background: var(--bg3);
+      color: var(--text);
+      padding: 8px 14px;
+      font-size: 13px;
+    }
+    .btn-secondary:hover:not(:disabled) { background: var(--hover-strong); }
+
+    main {
+      flex: 1;
+      padding: 24px;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .page-intro {
+      color: var(--text2);
+      font-size: 13px;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .period-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .period-bar label { color: var(--text2); font-size: 13px; }
+    .period-bar input[type="month"] {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      padding: 6px 10px;
+      outline: none;
+    }
+    .period-bar .spacer { flex: 1; }
+
+    /* ── Summary stat cards ─────────────────────────────────────── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 26px;
+    }
+    .stat-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+    .stat-card .sc-label {
+      color: var(--text2);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .stat-card .sc-value { font-size: 24px; font-weight: 600; line-height: 1.1; }
+    .stat-card .sc-sub   { color: var(--text3); font-size: 12px; margin-top: 4px; }
+    .stat-card.pushed    { border-color: rgba(16,185,129,0.4); }
+    .stat-card.pushed    .sc-value { color: var(--accent); }
+    .stat-card.failed    { border-color: rgba(239,68,68,0.4); }
+    .stat-card.failed    .sc-value { color: var(--neg); }
+    .stat-card.duplicate .sc-value { color: var(--text2); }
+    .stat-card.review    { border-color: rgba(245,158,11,0.35); }
+    .stat-card.review    .sc-value { color: var(--warn); }
+
+    /* ── Per-client blocks ──────────────────────────────────────── */
+    .client-block {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    .client-block-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .client-block-head .cb-name { font-size: 16px; font-weight: 600; }
+    .cb-counts { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+    .cb-count { font-size: 13px; color: var(--text2); display: inline-flex; align-items: center; gap: 5px; }
+    .cb-count strong { color: var(--text); font-weight: 600; }
+    .cb-count.sum { color: var(--accent); font-weight: 600; }
+
+    .inv-list { display: flex; flex-direction: column; }
+    .inv-row {
+      display: grid;
+      grid-template-columns: 110px 1fr 130px 120px 100px 40px;
+      gap: 12px;
+      align-items: center;
+      padding: 11px 18px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .inv-row:last-child { border-bottom: none; }
+    .inv-row:hover { background: var(--hover-faint); }
+    .inv-vendor { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .inv-vendor .inv-no { display: block; color: var(--text3); font-size: 11px; font-weight: 400; margin-top: 2px; }
+    .inv-amount { text-align: right; font-variant-numeric: tabular-nums; }
+    .inv-date { color: var(--text2); font-size: 12px; }
+    .inv-meta { color: var(--text3); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .inv-link { text-align: center; font-size: 16px; }
+    .inv-error {
+      grid-column: 1 / -1;
+      background: rgba(239,68,68,0.08);
+      color: var(--neg);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      margin-top: 2px;
+    }
+    .inv-error code { font-family: 'SF Mono', Consolas, monospace; font-size: 11px; }
+
+    .pill {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .pill.exported  { background: rgba(16,185,129,0.15);  color: var(--accent); }
+    .pill.failed    { background: rgba(239,68,68,0.15);   color: var(--neg); }
+    .pill.skipped   { background: rgba(156,163,175,0.18); color: var(--text2); }
+    .pill.locked    { background: rgba(245,158,11,0.15);  color: var(--warn); }
+    .pill.open      { background: var(--bg3);             color: var(--text2); }
+
+    .empty-msg {
+      padding: 40px;
+      text-align: center;
+      color: var(--text2);
+      font-size: 14px;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 13px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+      z-index: 1000;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: transform 0.25s, opacity 0.25s;
+      max-width: 360px;
+    }
+    .toast.visible { transform: translateY(0); opacity: 1; }
+    .toast.success { border-color: rgba(16,185,129,0.4); }
+    .toast.error   { border-color: rgba(239,68,68,0.4); color: var(--neg); }
+
+    @media (max-width: 720px) {
+      header { padding: 12px 16px; }
+      main { padding: 16px; }
+      .inv-row { grid-template-columns: 96px 1fr 90px; grid-row-gap: 4px; }
+      .inv-date, .inv-meta { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading-screen" style="display:flex">
+  <p style="color: var(--text2)">Laen...</p>
+</div>
+
+<div id="denied-screen">
+  <h2>Ligipääs keelatud</h2>
+  <p>Sul pole admin õigusi.</p>
+  <a href="../" class="nav-link">← Skoor avalehele</a>
+</div>
+
+<div id="app">
+  <header>
+    <a href="../" class="header-left" style="color:inherit">
+      <svg class="header-logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Skoor"><path d="M16 72 A38 38 0 1 1 84 72" fill="none" stroke="var(--logo-track)" stroke-width="10" stroke-linecap="round"/><path d="M16 72 A38 38 0 0 1 62 22" fill="none" stroke="#10b981" stroke-width="10" stroke-linecap="round"/><line x1="50" y1="72" x2="68" y2="44" stroke="var(--logo-needle)" stroke-width="5" stroke-linecap="round"/><circle cx="50" cy="72" r="7" fill="#10b981"/></svg>
+      <span class="header-title">Skoor<span class="badge">ADMIN</span></span>
+    </a>
+    <div class="header-right">
+      <a href="index.html" class="nav-link">Töölaud</a>
+      <a href="timer.html" class="nav-link">Tööaeg</a>
+      <a href="tasks.html" class="nav-link">Ülesanded</a>
+      <a href="reports.html" class="nav-link">Arved</a>
+      <a href="clients.html" class="nav-link">Kliendid</a>
+      <a href="templates.html" class="nav-link">Mallid</a>
+      <a href="diginaator.html" class="nav-link active">DiginaatoR</a>
+      <a href="settings.html" class="nav-link">Seaded</a>
+      <a href="../" class="nav-link">← Klientide vaade</a>
+      <button class="btn-secondary" id="logout-btn">Logi välja</button>
+    </div>
+  </header>
+
+  <main>
+    <p class="page-intro">
+      Ostuarvete liikumine — DiginaatoR loeb klientide e-postist arved, tunneb need Gemini abil ära ja saadab Meritisse (kinnitamata ostuarvena). Siin on perioodi kõikide klientide arvete seis: ✅ Meritis, ♻️ duplikaat (Merit lükkas korduvarve tagasi), ⚠️ viga (vajab käsitsi tähelepanu). Periood = töötlemise kuupäev.
+    </p>
+
+    <div class="period-bar">
+      <label>Periood:</label>
+      <input type="month" id="period-input">
+      <button class="btn-secondary" id="prev-period-btn">‹ Eelmine</button>
+      <button class="btn-secondary" id="next-period-btn">Järgmine ›</button>
+      <button class="btn-secondary" id="this-month-btn">See kuu</button>
+      <span class="spacer"></span>
+      <button class="btn-secondary" id="refresh-btn">↻ Värskenda</button>
+    </div>
+
+    <div class="stats-row" id="stats-row"></div>
+    <div id="clients-container"></div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL  = 'https://lpehwgpitfowhyiaxrhe.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWh3Z3BpdGZvd2h5aWF4cmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzE3NDIsImV4cCI6MjA5MjYwNzc0Mn0.VRAFWMrlyigtPlDVAk9KG2NiFLd1l5aRxwmNrariUfI';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let currentUser = null;
+let isAdmin = false;
+let clientsById = {};
+let currentPeriod = todayPeriod();
+
+const STATUS = {
+  pushed:       { label: 'Meritis',   icon: '✅', cls: 'exported' },
+  duplicate:    { label: 'Duplikaat', icon: '♻️', cls: 'skipped' },
+  failed:       { label: 'Viga',      icon: '⚠️', cls: 'failed' },
+  needs_review: { label: 'Ülevaatus', icon: '🔎', cls: 'locked' }
+};
+function statusMeta(s) { return STATUS[s] || { label: s || '—', icon: '•', cls: 'open' }; }
+
+// ── Helpers ─────────────────────────────────────────────────────
+function todayPeriod() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function shiftPeriod(period, delta) {
+  const [y, m] = period.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtEur(v, currency) {
+  if (v == null) return '—';
+  const n = new Intl.NumberFormat('et-EE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+  return n + ' ' + (currency && currency !== 'EUR' ? escapeHtml(currency) : '€');
+}
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return escapeHtml(iso);
+  return new Intl.DateTimeFormat('et-EE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+}
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return escapeHtml(iso);
+  return new Intl.DateTimeFormat('et-EE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(d);
+}
+function clientName(id) {
+  return (clientsById[id] && clientsById[id].name) || ('Tundmatu klient (' + String(id).slice(0,8) + ')');
+}
+function driveLink(row) {
+  const id = row.drive_pdf_id || row.drive_original_id;
+  return id ? `https://drive.google.com/file/d/${encodeURIComponent(id)}/view` : null;
+}
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} visible`;
+  clearTimeout(showToast._h);
+  showToast._h = setTimeout(() => t.classList.remove('visible'), 3000);
+}
+
+// ── Init ────────────────────────────────────────────────────────
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = '../'; return; }
+  currentUser = session.user;
+
+  const { data: adminRow } = await sb.from('admins').select('user_id').eq('user_id', currentUser.id).maybeSingle();
+  isAdmin = !!adminRow;
+  if (!isAdmin) {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('denied-screen').style.display = 'flex';
+    return;
+  }
+
+  await loadClients();
+
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  document.getElementById('period-input').value = currentPeriod;
+  bindUIEvents();
+
+  await refresh();
+
+  await SkoorTimerBanner.init({
+    sb, currentUser,
+    getClientName: (id) => clientName(id)
+  });
+
+  sb.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT') window.location.href = '../';
+  });
+}
+
+async function loadClients() {
+  const { data, error } = await sb.from('clients').select('id, name, slug').order('name');
+  if (error) { showToast('Kliente ei saanud laadida: ' + error.message, 'error'); return; }
+  clientsById = {};
+  (data || []).forEach(c => { clientsById[c.id] = c; });
+}
+
+async function loadInbox() {
+  const start = `${currentPeriod}-01`;
+  const end   = `${shiftPeriod(currentPeriod, 1)}-01`;
+  const { data, error } = await sb.from('purchase_inbox')
+    .select('id, client_id, vendor_name, vendor_reg_no, invoice_no, invoice_date, total, currency, status, merit_doc_id, drive_pdf_id, drive_original_id, error_message, confidence, received_at, created_at')
+    .gte('created_at', start)
+    .lt('created_at', end)
+    .order('created_at', { ascending: false });
+  if (error) { showToast('Arveid ei saanud laadida: ' + error.message, 'error'); return []; }
+  return data || [];
+}
+
+async function refresh() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) btn.disabled = true;
+  const rows = await loadInbox();
+  render(rows);
+  if (btn) btn.disabled = false;
+}
+
+// ── Render ──────────────────────────────────────────────────────
+function render(rows) {
+  renderStats(rows);
+  renderClients(rows);
+}
+
+function renderStats(rows) {
+  const by = { pushed: 0, duplicate: 0, failed: 0, needs_review: 0, other: 0 };
+  let pushedSum = 0;
+  rows.forEach(r => {
+    if (r.status in by) by[r.status]++; else by.other++;
+    if (r.status === 'pushed' && r.total != null) pushedSum += Number(r.total) || 0;
+  });
+  const decided = by.pushed + by.failed;
+  const successRate = decided > 0 ? Math.round((by.pushed / decided) * 100) : null;
+
+  const cards = [];
+  cards.push(`
+    <div class="stat-card">
+      <div class="sc-label">Arveid kokku</div>
+      <div class="sc-value">${rows.length}</div>
+      <div class="sc-sub">${Object.keys(rows.reduce((a,r)=>{a[r.client_id]=1;return a;},{})).length} klienti</div>
+    </div>`);
+  cards.push(`
+    <div class="stat-card pushed">
+      <div class="sc-label">✅ Meritis</div>
+      <div class="sc-value">${by.pushed}</div>
+      <div class="sc-sub">${fmtEur(pushedSum)}</div>
+    </div>`);
+  cards.push(`
+    <div class="stat-card duplicate">
+      <div class="sc-label">♻️ Duplikaadid</div>
+      <div class="sc-value">${by.duplicate}</div>
+      <div class="sc-sub">Merit lükkas korduva tagasi</div>
+    </div>`);
+  cards.push(`
+    <div class="stat-card failed">
+      <div class="sc-label">⚠️ Vead</div>
+      <div class="sc-value">${by.failed}</div>
+      <div class="sc-sub">vajavad käsitsi tähelepanu</div>
+    </div>`);
+  if (by.needs_review > 0) {
+    cards.push(`
+      <div class="stat-card review">
+        <div class="sc-label">🔎 Ülevaatus</div>
+        <div class="sc-value">${by.needs_review}</div>
+        <div class="sc-sub">ootab kinnitust</div>
+      </div>`);
+  }
+  cards.push(`
+    <div class="stat-card">
+      <div class="sc-label">Õnnestumismäär</div>
+      <div class="sc-value">${successRate == null ? '—' : successRate + '%'}</div>
+      <div class="sc-sub">${decided} otsustatud arvest</div>
+    </div>`);
+
+  document.getElementById('stats-row').innerHTML = cards.join('');
+}
+
+function renderClients(rows) {
+  const container = document.getElementById('clients-container');
+  if (rows.length === 0) {
+    container.innerHTML = '<div class="empty-msg">Selles perioodis pole ühtegi arvet liikunud.</div>';
+    return;
+  }
+
+  // group by client
+  const groups = {};
+  rows.forEach(r => {
+    (groups[r.client_id] = groups[r.client_id] || []).push(r);
+  });
+
+  // sort clients by row count desc, then name
+  const clientIds = Object.keys(groups).sort((a, b) => {
+    const d = groups[b].length - groups[a].length;
+    return d !== 0 ? d : clientName(a).localeCompare(clientName(b), 'et');
+  });
+
+  container.innerHTML = clientIds.map(cid => renderClientBlock(cid, groups[cid])).join('');
+}
+
+function renderClientBlock(clientId, items) {
+  const counts = { pushed: 0, duplicate: 0, failed: 0, needs_review: 0, other: 0 };
+  let sum = 0;
+  items.forEach(r => {
+    if (r.status in counts) counts[r.status]++; else counts.other++;
+    if (r.status === 'pushed' && r.total != null) sum += Number(r.total) || 0;
+  });
+
+  const countChips = [];
+  if (counts.pushed)       countChips.push(`<span class="cb-count"><strong>${counts.pushed}</strong> ✅</span>`);
+  if (counts.duplicate)    countChips.push(`<span class="cb-count"><strong>${counts.duplicate}</strong> ♻️</span>`);
+  if (counts.failed)       countChips.push(`<span class="cb-count"><strong>${counts.failed}</strong> ⚠️</span>`);
+  if (counts.needs_review) countChips.push(`<span class="cb-count"><strong>${counts.needs_review}</strong> 🔎</span>`);
+  if (sum > 0)             countChips.push(`<span class="cb-count sum">${fmtEur(sum)}</span>`);
+
+  return `
+    <div class="client-block">
+      <div class="client-block-head">
+        <span class="cb-name">${escapeHtml(clientName(clientId))}</span>
+        <div class="cb-counts">${countChips.join('')}</div>
+      </div>
+      <div class="inv-list">
+        ${items.map(renderInvoiceRow).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderInvoiceRow(r) {
+  const meta = statusMeta(r.status);
+  const link = driveLink(r);
+  const vendor = r.vendor_name ? escapeHtml(r.vendor_name) : '<span style="color:var(--text3)">tarnija tundmatu</span>';
+  const invNo = r.invoice_no ? `<span class="inv-no">arve nr ${escapeHtml(String(r.invoice_no).slice(0, 40))}</span>` : '';
+
+  const errorLine = (r.status === 'failed' && r.error_message)
+    ? `<div class="inv-error">⚠️ ${escapeHtml(r.error_message)}</div>`
+    : '';
+
+  return `
+    <div class="inv-row">
+      <span><span class="pill ${meta.cls}">${meta.icon} ${escapeHtml(meta.label)}</span></span>
+      <span class="inv-vendor">${vendor}${invNo}</span>
+      <span class="inv-amount">${r.total != null ? fmtEur(r.total, r.currency) : '<span style="color:var(--text3)">—</span>'}</span>
+      <span class="inv-date">${r.invoice_date ? fmtDate(r.invoice_date) : '—'}</span>
+      <span class="inv-meta" title="Töödeldud ${fmtDateTime(r.created_at)}">${fmtDateTime(r.created_at)}</span>
+      <span class="inv-link">${link ? `<a href="${link}" target="_blank" rel="noopener" title="Ava arhiveeritud PDF Drive'is">📄</a>` : ''}</span>
+      ${errorLine}
+    </div>
+  `;
+}
+
+// ── UI events ───────────────────────────────────────────────────
+function bindUIEvents() {
+  document.getElementById('logout-btn').addEventListener('click', () => sb.auth.signOut());
+
+  document.getElementById('period-input').addEventListener('change', async (e) => {
+    currentPeriod = e.target.value;
+    await refresh();
+  });
+  document.getElementById('prev-period-btn').addEventListener('click', async () => {
+    currentPeriod = shiftPeriod(currentPeriod, -1);
+    document.getElementById('period-input').value = currentPeriod;
+    await refresh();
+  });
+  document.getElementById('next-period-btn').addEventListener('click', async () => {
+    currentPeriod = shiftPeriod(currentPeriod, 1);
+    document.getElementById('period-input').value = currentPeriod;
+    await refresh();
+  });
+  document.getElementById('this-month-btn').addEventListener('click', async () => {
+    currentPeriod = todayPeriod();
+    document.getElementById('period-input').value = currentPeriod;
+    await refresh();
+  });
+  document.getElementById('refresh-btn').addEventListener('click', refresh);
+}
+
+init();
+</script>
+</body>
+</html>
