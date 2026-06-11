@@ -227,7 +227,7 @@
     .client-block.open .inv-list { display: flex; }
     .inv-row {
       display: grid;
-      grid-template-columns: 110px 1fr 130px 120px 100px 40px;
+      grid-template-columns: 110px 1fr 130px 110px 92px 84px;
       gap: 12px;
       align-items: center;
       padding: 11px 18px;
@@ -241,7 +241,16 @@
     .inv-amount { text-align: right; font-variant-numeric: tabular-nums; }
     .inv-date { color: var(--text2); font-size: 12px; }
     .inv-meta { color: var(--text3); font-size: 11px; font-variant-numeric: tabular-nums; }
-    .inv-link { text-align: center; font-size: 16px; }
+    .inv-link { text-align: center; font-size: 16px; display: flex; gap: 7px; align-items: center; justify-content: center; }
+    .resend-btn {
+      background: var(--bg3); color: var(--text2);
+      width: 27px; height: 27px; border-radius: 6px;
+      font-size: 15px; line-height: 1; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .resend-btn:hover:not(:disabled) { color: var(--accent); background: rgba(16,185,129,0.14); }
+    .resend-pending { color: var(--warn); font-size: 15px; line-height: 1; display: inline-block; animation: rspin 1.4s linear infinite; }
+    @keyframes rspin { to { transform: rotate(360deg); } }
     .inv-error {
       grid-column: 1 / -1;
       background: rgba(239,68,68,0.08);
@@ -301,7 +310,7 @@
     @media (max-width: 720px) {
       header { padding: 12px 16px; }
       main { padding: 16px; }
-      .inv-row { grid-template-columns: 96px 1fr 90px; grid-row-gap: 4px; }
+      .inv-row { grid-template-columns: 84px 1fr auto; grid-row-gap: 4px; }
       .inv-date, .inv-meta { display: none; }
     }
   </style>
@@ -474,7 +483,7 @@ async function loadClients() {
 async function loadInbox() {
   const start = `${currentPeriod}-01`;
   const end   = `${shiftPeriod(currentPeriod, 1)}-01`;
-  const cols = 'id, client_id, vendor_name, vendor_reg_no, invoice_no, invoice_date, total, currency, status, merit_doc_id, drive_pdf_id, drive_original_id, error_message, confidence, received_at, created_at';
+  const cols = 'id, client_id, vendor_name, vendor_reg_no, invoice_no, invoice_date, total, currency, status, merit_doc_id, drive_pdf_id, drive_original_id, error_message, confidence, received_at, created_at, source_message_id, resend_requested, resend_done, resend_error';
   let q = sb.from('purchase_inbox').select(cols);
   if (periodBasis === 'invoice_date') {
     // Arve kuupäeva järgi + selles kuus töödeldud kuupäevata arved (vead/duplikaadid),
@@ -500,6 +509,24 @@ async function refresh() {
   const rows = await loadInbox();
   render(rows);
   if (btn) btn.disabled = false;
+}
+
+// "Saada uuesti": seab resend_requested lipu; n8n resend-voog pollib ja töötleb
+// dokumendi Gmailist uuesti läbi (jätab DiginaatoR-i dubleerimiskontrolli vahele).
+async function requestResend(id, label) {
+  const ok = confirm(
+    `Saada "${label}" Gmailist uuesti Meritisse?\n\n` +
+    `Dokument töödeldakse 1–2 min jooksul uuesti läbi.\n\n` +
+    `NB: kui sama arve on juba Meritis sama numbriga, eemalda see esmalt Meritist — ` +
+    `muidu Merit lükkab korduva tagasi.`
+  );
+  if (!ok) return;
+  const { error } = await sb.from('purchase_inbox')
+    .update({ resend_requested: new Date().toISOString(), resend_done: null, resend_error: null })
+    .eq('id', id);
+  if (error) { showToast('Resend-päring ebaõnnestus: ' + error.message, 'error'); return; }
+  showToast('Saadan uuesti — värskenda 1–2 min pärast.', 'success');
+  await refresh();
 }
 
 // ── Render ──────────────────────────────────────────────────────
@@ -640,9 +667,21 @@ function renderInvoiceRow(r) {
   const vendor = r.vendor_name ? escapeHtml(r.vendor_name) : '<span style="color:var(--text3)">tarnija tundmatu</span>';
   const invNo = r.invoice_no ? `<span class="inv-no">arve nr ${escapeHtml(String(r.invoice_no).slice(0, 40))}</span>` : '';
 
-  const errorLine = (r.status === 'failed' && r.error_message)
-    ? `<div class="inv-error">⚠️ ${escapeHtml(r.error_message)}</div>`
-    : '';
+  // Resend: ootel kui lipp seatud ja veel töötlemata; nupp ainult mitte-pushed ridadel millel on Gmaili allikas
+  const resendPending = !!r.resend_requested &&
+    (!r.resend_done || new Date(r.resend_done) < new Date(r.resend_requested));
+  const canResend = r.status !== 'pushed' && !!r.source_message_id && !resendPending;
+  const resendLabel = r.vendor_name || 'see dokument';
+  const actions = `
+        ${link ? `<a href="${link}" target="_blank" rel="noopener" title="Ava arhiveeritud PDF Drive'is">📄</a>` : ''}
+        ${resendPending
+          ? `<span class="resend-pending" title="Saadan uuesti — värskenda peagi">↻</span>`
+          : canResend
+            ? `<button class="resend-btn" data-id="${escapeHtml(r.id)}" data-label="${escapeHtml(resendLabel)}" title="Saada see dokument Gmailist uuesti Meritisse">↻</button>`
+            : ''}`;
+
+  const errMsg = (r.status === 'failed' && r.error_message) ? r.error_message : (r.resend_error || '');
+  const errorLine = errMsg ? `<div class="inv-error">⚠️ ${escapeHtml(errMsg)}</div>` : '';
 
   return `
     <div class="inv-row">
@@ -651,7 +690,7 @@ function renderInvoiceRow(r) {
       <span class="inv-amount">${r.total != null ? fmtEur(r.total, r.currency) : '<span style="color:var(--text3)">—</span>'}</span>
       <span class="inv-date">${r.invoice_date ? fmtDate(r.invoice_date) : '—'}</span>
       <span class="inv-meta" title="Töödeldud ${fmtDateTime(r.created_at)}">${fmtDateTime(r.created_at)}</span>
-      <span class="inv-link">${link ? `<a href="${link}" target="_blank" rel="noopener" title="Ava arhiveeritud PDF Drive'is">📄</a>` : ''}</span>
+      <span class="inv-link">${actions}</span>
       ${errorLine}
     </div>
   `;
@@ -682,6 +721,14 @@ function bindUIEvents() {
   });
   document.getElementById('refresh-btn').addEventListener('click', refresh);
   document.getElementById('client-search-input').addEventListener('input', applyClientFilter);
+
+  // Resend-nupud (delegatsioon — konteiner on püsiv, sisu uueneb iga refresh'iga)
+  document.getElementById('clients-container').addEventListener('click', (e) => {
+    const btn = e.target.closest('.resend-btn');
+    if (!btn) return;
+    e.stopPropagation();
+    requestResend(btn.dataset.id, btn.dataset.label);
+  });
 
   document.querySelectorAll('.basis-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
