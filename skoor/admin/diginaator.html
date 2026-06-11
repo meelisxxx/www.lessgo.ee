@@ -238,6 +238,10 @@
     .inv-row:hover { background: var(--hover-faint); }
     .inv-vendor { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .inv-vendor .inv-no { display: block; color: var(--text3); font-size: 11px; font-weight: 400; margin-top: 2px; }
+    .dt { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; vertical-align: middle; }
+    .dt-arve     { background: rgba(16,185,129,0.15); color: var(--accent); }
+    .dt-kviitung { background: rgba(245,158,11,0.15);  color: var(--warn); }
+    .dt-muu      { background: var(--bg3);             color: var(--text2); }
     .inv-amount { text-align: right; font-variant-numeric: tabular-nums; }
     .inv-date { color: var(--text2); font-size: 12px; }
     .inv-meta { color: var(--text3); font-size: 11px; font-variant-numeric: tabular-nums; }
@@ -483,7 +487,7 @@ async function loadClients() {
 async function loadInbox() {
   const start = `${currentPeriod}-01`;
   const end   = `${shiftPeriod(currentPeriod, 1)}-01`;
-  const cols = 'id, client_id, vendor_name, vendor_reg_no, invoice_no, invoice_date, total, currency, status, merit_doc_id, drive_pdf_id, drive_original_id, error_message, confidence, received_at, created_at, source_message_id, resend_requested, resend_done, resend_error';
+  const cols = 'id, client_id, vendor_name, vendor_reg_no, invoice_no, invoice_date, total, currency, status, doc_type, merit_doc_id, drive_pdf_id, drive_original_id, error_message, confidence, received_at, created_at, source_message_id, resend_requested, resend_done, resend_error';
   let q = sb.from('purchase_inbox').select(cols);
   if (periodBasis === 'invoice_date') {
     // Arve kuupäeva järgi + selles kuus töödeldud kuupäevata arved (vead/duplikaadid),
@@ -666,6 +670,9 @@ function renderInvoiceRow(r) {
   const link = driveLink(r);
   const vendor = r.vendor_name ? escapeHtml(r.vendor_name) : '<span style="color:var(--text3)">tarnija tundmatu</span>';
   const invNo = r.invoice_no ? `<span class="inv-no">arve nr ${escapeHtml(String(r.invoice_no).slice(0, 40))}</span>` : '';
+  const dt = r.doc_type;
+  const dtBadge = (dt === 'arve' || dt === 'kviitung' || dt === 'muu')
+    ? `<span class="dt dt-${dt}" title="DiginaatoR tuvastas dokumendi liigi">${dt}</span>` : '';
 
   // Resend: ootel kui lipp seatud ja veel töötlemata; nupp ainult mitte-pushed ridadel millel on Gmaili allikas
   const resendPending = !!r.resend_requested &&
@@ -686,7 +693,7 @@ function renderInvoiceRow(r) {
   return `
     <div class="inv-row">
       <span><span class="pill ${meta.cls}">${meta.icon} ${escapeHtml(meta.label)}</span></span>
-      <span class="inv-vendor">${vendor}${invNo}</span>
+      <span class="inv-vendor">${vendor}${dtBadge}${invNo}</span>
       <span class="inv-amount">${r.total != null ? fmtEur(r.total, r.currency) : '<span style="color:var(--text3)">—</span>'}</span>
       <span class="inv-date">${r.invoice_date ? fmtDate(r.invoice_date) : '—'}</span>
       <span class="inv-meta" title="Töödeldud ${fmtDateTime(r.created_at)}">${fmtDateTime(r.created_at)}</span>
