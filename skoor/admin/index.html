@@ -375,6 +375,36 @@
     }
     .group-notes textarea:focus { border-color: var(--accent); }
     .group-notes textarea::placeholder { color: var(--text3); }
+    /* Dokumendi-päring rida — sama mehhanism kui Kliendid-lehel (client_doc_requests) */
+    .doc-ask-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .doc-ask-row .btn-doc-ask {
+      width: auto;
+      flex-shrink: 0;
+      background: var(--info);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.2s;
+    }
+    .doc-ask-row .btn-doc-ask:hover { opacity: 0.88; transform: none; }
+    .doc-ask-row .doc-date {
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      color: var(--text3);
+    }
+    .doc-ask-row .doc-date.recent { color: var(--accent); }
+    .doc-ask-row .doc-date.stale  { color: var(--warn); }
 
     /* Task table inside group */
     .tasks-scroll { overflow-x: auto; }
@@ -684,6 +714,7 @@ let isAdmin = false;
 let clients = [];
 let admins = [];
 let tasks = [];
+let docRequests = {};            // client_id → client_doc_requests rida (dokumendi-päringu jälgimine)
 let activeTimer = null;
 let currentPeriod = todayPeriod();
 let currentDay = null;   // kui valitud, filtreerime ühe päeva tähtajad; muidu kogu kuu
@@ -814,6 +845,7 @@ async function init() {
 
   await loadAdmins();
   await loadClients();
+  await loadDocRequests();
   await loadActiveTimer();
   await loadTasks();
   populateClientDropdowns();
@@ -843,6 +875,22 @@ async function loadClients() {
   const { data, error } = await sb.from('clients').select('id, name, notes').order('name');
   if (error) { console.error('clients:', error); return; }
   clients = data || [];
+}
+async function loadDocRequests() {
+  const { data, error } = await sb.from('client_doc_requests').select('*');
+  if (error) { console.error('doc_requests:', error); return; }
+  docRequests = {};
+  (data || []).forEach(d => { docRequests[d.client_id] = d; });
+}
+// Dokumendi-päringu kuupäev (last_request_at on timestamptz) → "12/06/2026"
+function fmtDocDate(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+}
+function docDaysAgo(iso) {
+  if (!iso) return null;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 }
 async function loadTasks() {
   // Päeva-vaade: täpne tähtaeg, ilma carry-over'ita.
@@ -1036,11 +1084,31 @@ function renderGroup({ client, tasks: cTasks, status }) {
         <div class="group-tasks">${body}</div>
         <div class="group-notes">
           <label>📌 Märkmed <span class="notes-status" data-notes-status="${client.id}"></span></label>
+          ${renderDocAskRow(client)}
           <textarea data-client-notes data-client="${client.id}" rows="3"
             placeholder="Püsivad märkmed kliendi kohta… (sünkroonis Kliendid-lehega)">${escapeHtml(client.notes || '')}</textarea>
         </div>
       </div>
     </section>
+  `;
+}
+
+// Dokumendi-päringu rida Märkmed-kasti kohale: "Küsisin täna" nupp + viimati küsitud kuupäev.
+// Sama client_doc_requests mehhanism kui Kliendid-lehel; kuupäev ilma selgitava tekstita.
+function renderDocAskRow(client) {
+  const dr = docRequests[client.id];
+  const lastAt = dr?.last_request_at;
+  let dateHtml = '';
+  if (lastAt) {
+    const ago = docDaysAgo(lastAt);
+    const cls = ago >= 7 ? 'stale' : 'recent';
+    dateHtml = `<span class="doc-date ${cls}" title="Dokumente viimati küsitud">${fmtDocDate(lastAt)}</span>`;
+  }
+  return `
+    <div class="doc-ask-row" data-doc-row="${client.id}">
+      <button class="btn-doc-ask" data-doc-ask="${client.id}">📨 Küsisin täna</button>
+      ${dateHtml}
+    </div>
   `;
 }
 
@@ -1108,6 +1176,9 @@ function bindRowEvents() {
   root.querySelectorAll('[data-client-notes]').forEach(el => {
     el.addEventListener('input', () => debounceSaveClientNotes(el.dataset.client, el.value));
   });
+  root.querySelectorAll('[data-doc-ask]').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); askDocs(btn.dataset.docAsk); });
+  });
 }
 
 // ── Kliendi märkmed (sünkroonis Kliendid-lehega — sama clients.notes väli) ──
@@ -1132,6 +1203,32 @@ async function saveClientNotes(clientId, rawValue) {
   if (statusEl) {
     statusEl.textContent = '✓ salvestatud';
     setTimeout(() => { if (statusEl.textContent === '✓ salvestatud') statusEl.textContent = ''; }, 2000);
+  }
+}
+
+// ── Dokumendi-päring: "Küsisin täna" (sama client_doc_requests kui Kliendid-lehel) ──
+async function askDocs(clientId) {
+  const dr = docRequests[clientId];
+  const payload = {
+    client_id: clientId,
+    last_request_at: new Date().toISOString(),
+    last_request_note: dr?.last_request_note ?? null,   // säilita Kliendid-lehel sisestatud märkus
+    updated_at: new Date().toISOString(),
+    updated_by: currentUser.id
+  };
+  const { data, error } = await sb.from('client_doc_requests')
+    .upsert(payload, { onConflict: 'client_id' })
+    .select()
+    .single();
+  if (error) { alert('Dokumendi-päringu salvestus ebaõnnestus: ' + error.message); return; }
+  docRequests[clientId] = data;
+
+  // Uuenda ainult selle kliendi rida (väldib kogu ülesandeloendi re-renderdust)
+  const rowEl = document.querySelector(`[data-doc-row="${clientId}"]`);
+  if (rowEl) {
+    rowEl.outerHTML = renderDocAskRow(clients.find(c => c.id === clientId) || { id: clientId });
+    const newBtn = document.querySelector(`[data-doc-ask="${clientId}"]`);
+    if (newBtn) newBtn.addEventListener('click', (e) => { e.stopPropagation(); askDocs(clientId); });
   }
 }
 
