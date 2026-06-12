@@ -200,6 +200,21 @@
     .period-bar select { width: auto; min-width: 160px; }
     .period-bar .spacer { flex: 1; }
 
+    /* Ülesande-staatuse filter (peida/näita Tegemata/Blokeeritud/Tehtud) */
+    .task-filter { display: flex; align-items: center; gap: 6px; }
+    .task-filter-label { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+    .tf-chip {
+      font: inherit; font-size: 12px; font-weight: 600; line-height: 1;
+      padding: 6px 11px; border-radius: 999px; cursor: pointer;
+      border: 1px solid var(--border); background: var(--bg2); color: var(--text2);
+      transition: opacity .12s, border-color .12s, background .12s; user-select: none;
+    }
+    .tf-chip:hover { border-color: var(--text2); }
+    .tf-chip.active.tf-todo    { background: rgba(129,140,248,0.15); color: var(--info);   border-color: rgba(129,140,248,0.45); }
+    .tf-chip.active.tf-blocked { background: rgba(245,158,11,0.18);  color: var(--warn);   border-color: rgba(245,158,11,0.45); }
+    .tf-chip.active.tf-done    { background: rgba(16,185,129,0.15);  color: var(--accent); border-color: rgba(16,185,129,0.45); }
+    .tf-chip:not(.active) { opacity: 0.45; text-decoration: line-through; }
+
     /* Stats */
     .stats-grid {
       display: grid;
@@ -538,6 +553,12 @@
         <option value="green">🟢 Rohelised</option>
         <option value="gray">⚪ Blokeeritud</option>
       </select>
+      <div class="task-filter" id="task-filter" title="Klikk peidab/näitab selle staatusega tööd">
+        <span class="task-filter-label">Tööd:</span>
+        <button type="button" class="tf-chip tf-todo active"    data-tstatus="todo">Tegemata</button>
+        <button type="button" class="tf-chip tf-blocked active" data-tstatus="blocked">Blokeeritud</button>
+        <button type="button" class="tf-chip tf-done active"    data-tstatus="done">Tehtud</button>
+      </div>
     </div>
 
     <!-- Stats -->
@@ -728,6 +749,12 @@ function escapeHtml(s) {
 }
 function priorityLabel(p) { return { high: 'Kõrge', medium: 'Keskmine', low: 'Madal' }[p] || p; }
 function statusLabel(s)   { return { todo: 'Tegemata', blocked: 'Blokeeritud', done: 'Tehtud' }[s] || s; }
+
+// Ülesande-staatuse filter (Töölaua "Tööd:" chip'id) — millised staatused on nähtavad.
+// Vaikimisi kõik; Eve saab nt "Tehtud" välja klikkida, et tehtud tööd ekraanilt peita.
+const visibleTaskStatuses = new Set(['todo', 'blocked', 'done']);
+const taskStatusFilterActive = () => visibleTaskStatuses.size < 3;
+const taskVisible = (t) => visibleTaskStatuses.has(t.status);
 function clientName(id)   { const c = clients.find(x => x.id === id); return c?.name || '?'; }
 function adminName(userId) {
   if (!userId) return '—';
@@ -925,6 +952,9 @@ function render() {
   // Hide clients with 0 tasks (unless filter is set so user explicitly asked)
   if (!fStatus && !fSearch) filteredGroups = filteredGroups.filter(g => g.tasks.length > 0);
 
+  // Ülesande-staatuse filter: peida grupid, kus pole ühtegi nähtavat tööd (nt kõik tehtud + "Tehtud" peidetud)
+  if (taskStatusFilterActive()) filteredGroups = filteredGroups.filter(g => g.tasks.some(taskVisible));
+
   // Sort: red → yellow → gray → green; tie-break by name
   const order = { red: 0, yellow: 1, gray: 2, green: 3 };
   filteredGroups.sort((a, b) => {
@@ -978,7 +1008,10 @@ function renderGroup({ client, tasks: cTasks, status }) {
   const rows = topLevel.slice().sort(sortFn).map(parent => {
     const kids = (kidsByParent.get(parent.id) || []).slice().sort(sortFn);
     const openKids = kids.filter(k => k.status !== 'done').length;
-    return renderTaskRow(parent, false, openKids) + kids.map(k => renderTaskRow(k, true, 0)).join('');
+    // Ülesande-staatuse filter: peida read, mille staatus on välja lülitatud
+    const parentRow = taskVisible(parent) ? renderTaskRow(parent, false, openKids) : '';
+    const kidRows   = kids.filter(taskVisible).map(k => renderTaskRow(k, true, 0)).join('');
+    return parentRow + kidRows;
   }).join('');
 
   let body;
@@ -1481,6 +1514,17 @@ function bindUIEvents() {
   });
   document.getElementById('filter-status').addEventListener('change', render);
   document.getElementById('client-search-input').addEventListener('input', render);
+
+  // Ülesande-staatuse filtri chip'id: klikk peidab/näitab selle staatusega tööd
+  document.querySelectorAll('#task-filter .tf-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const s = chip.dataset.tstatus;
+      if (visibleTaskStatuses.has(s)) visibleTaskStatuses.delete(s);
+      else visibleTaskStatuses.add(s);
+      chip.classList.toggle('active', visibleTaskStatuses.has(s));
+      render();
+    });
+  });
 
   // Stat tiles act as filter shortcuts (toggle: re-click same tile clears filter)
   document.querySelectorAll('.stat-tile').forEach(tile => {
