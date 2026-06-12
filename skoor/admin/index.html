@@ -405,6 +405,20 @@
     }
     .doc-ask-row .doc-date.recent { color: var(--accent); }
     .doc-ask-row .doc-date.stale  { color: var(--warn); }
+    .doc-ask-row .doc-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .doc-ask-row .btn-doc-ok {
+      width: auto;
+      background: transparent;
+      color: var(--text2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .doc-ask-row .btn-doc-ok:hover { color: var(--text); border-color: var(--text2); transform: none; }
 
     /* Task table inside group */
     .tasks-scroll { overflow-x: auto; }
@@ -1098,16 +1112,20 @@ function renderGroup({ client, tasks: cTasks, status }) {
 function renderDocAskRow(client) {
   const dr = docRequests[client.id];
   const lastAt = dr?.last_request_at;
-  let dateHtml = '';
+  let rightHtml = '';
   if (lastAt) {
     const ago = docDaysAgo(lastAt);
     const cls = ago >= 7 ? 'stale' : 'recent';
-    dateHtml = `<span class="doc-date ${cls}" title="Dokumente viimati küsitud">${fmtDocDate(lastAt)}</span>`;
+    rightHtml = `
+      <span class="doc-right">
+        <span class="doc-date ${cls}" title="Dokumente viimati küsitud">${fmtDocDate(lastAt)}</span>
+        <button class="btn-doc-ok" data-doc-ok="${client.id}" title="Dokumendid saadud — tühjenda päring">OK</button>
+      </span>`;
   }
   return `
     <div class="doc-ask-row" data-doc-row="${client.id}">
       <button class="btn-doc-ask" data-doc-ask="${client.id}">📨 Küsisin täna</button>
-      ${dateHtml}
+      ${rightHtml}
     </div>
   `;
 }
@@ -1179,6 +1197,9 @@ function bindRowEvents() {
   root.querySelectorAll('[data-doc-ask]').forEach(btn => {
     btn.addEventListener('click', (e) => { e.stopPropagation(); askDocs(btn.dataset.docAsk); });
   });
+  root.querySelectorAll('[data-doc-ok]').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); clearDocs(btn.dataset.docOk); });
+  });
 }
 
 // ── Kliendi märkmed (sünkroonis Kliendid-lehega — sama clients.notes väli) ──
@@ -1222,14 +1243,27 @@ async function askDocs(clientId) {
     .single();
   if (error) { alert('Dokumendi-päringu salvestus ebaõnnestus: ' + error.message); return; }
   docRequests[clientId] = data;
+  updateDocRow(clientId);
+}
 
-  // Uuenda ainult selle kliendi rida (väldib kogu ülesandeloendi re-renderdust)
+// "OK" = dokumendid saadud → tühjenda päring (kustutab client_doc_requests rea, nagu Kliendid-lehe "Saadud / tühjenda")
+async function clearDocs(clientId) {
+  if (!confirm('Märgi dokumendid saaduks ja tühjenda päring?')) return;
+  const { error } = await sb.from('client_doc_requests').delete().eq('client_id', clientId);
+  if (error) { alert('Tühjendamine ebaõnnestus: ' + error.message); return; }
+  delete docRequests[clientId];
+  updateDocRow(clientId);
+}
+
+// Uuenda ainult selle kliendi doc-rida (väldib kogu ülesandeloendi re-renderdust) + seo nupud uuesti
+function updateDocRow(clientId) {
   const rowEl = document.querySelector(`[data-doc-row="${clientId}"]`);
-  if (rowEl) {
-    rowEl.outerHTML = renderDocAskRow(clients.find(c => c.id === clientId) || { id: clientId });
-    const newBtn = document.querySelector(`[data-doc-ask="${clientId}"]`);
-    if (newBtn) newBtn.addEventListener('click', (e) => { e.stopPropagation(); askDocs(clientId); });
-  }
+  if (!rowEl) return;
+  rowEl.outerHTML = renderDocAskRow(clients.find(c => c.id === clientId) || { id: clientId });
+  const askBtn = document.querySelector(`[data-doc-ask="${clientId}"]`);
+  if (askBtn) askBtn.addEventListener('click', (e) => { e.stopPropagation(); askDocs(clientId); });
+  const okBtn = document.querySelector(`[data-doc-ok="${clientId}"]`);
+  if (okBtn) okBtn.addEventListener('click', (e) => { e.stopPropagation(); clearDocs(clientId); });
 }
 
 // ── Toggle done ─────────────────────────────────────────────────
