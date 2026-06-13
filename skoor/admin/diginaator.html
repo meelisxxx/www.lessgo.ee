@@ -187,6 +187,13 @@
     .stat-card.duplicate .sc-value { color: var(--text2); }
     .stat-card.review    { border-color: rgba(245,158,11,0.35); }
     .stat-card.review    .sc-value { color: var(--warn); }
+    .stat-card.clickable { cursor: pointer; transition: border-color .12s, box-shadow .12s, transform .04s; user-select: none; }
+    .stat-card.clickable:hover  { border-color: var(--text3); }
+    .stat-card.clickable:active { transform: translateY(1px); }
+    .stat-card.active           { box-shadow: 0 0 0 2px var(--text2) inset; border-color: var(--text2); }
+    .stat-card.pushed.active    { box-shadow: 0 0 0 2px var(--accent) inset; border-color: var(--accent); }
+    .stat-card.failed.active    { box-shadow: 0 0 0 2px var(--neg) inset;    border-color: var(--neg); }
+    .stat-card.review.active    { box-shadow: 0 0 0 2px var(--warn) inset;   border-color: var(--warn); }
 
     /* ── Per-client blocks ──────────────────────────────────────── */
     .client-block {
@@ -389,6 +396,8 @@ let isAdmin = false;
 let clientsById = {};
 let currentPeriod = todayPeriod();
 let periodBasis = 'created_at';   // 'created_at' = töötlemise kuup. | 'invoice_date' = arve kuup.
+let statusFilter = null;          // null = kõik | 'pushed'|'duplicate'|'failed'|'needs_review' (statistikakaardi-filter)
+let currentRows = [];             // viimati laetud read — kaardi-filter renderdab uuesti ilma DB-päringuta
 
 const STATUS = {
   pushed:       { label: 'Meritis',   icon: '✅', cls: 'exported' },
@@ -535,8 +544,9 @@ async function requestResend(id, label) {
 
 // ── Render ──────────────────────────────────────────────────────
 function render(rows) {
-  renderStats(rows);
-  renderClients(rows);
+  currentRows = rows;
+  renderStats(rows);                                   // kaardid = kogu perioodi arvud
+  renderClients(statusFilter ? rows.filter(r => r.status === statusFilter) : rows);
 }
 
 function renderStats(rows) {
@@ -550,33 +560,34 @@ function renderStats(rows) {
   const successRate = decided > 0 ? Math.round((by.pushed / decided) * 100) : null;
 
   const cards = [];
+  const act = s => (statusFilter === s ? ' active' : '');
   cards.push(`
-    <div class="stat-card">
+    <div class="stat-card clickable${statusFilter === null ? ' active' : ''}" data-status="" title="Näita kõiki staatusi">
       <div class="sc-label">Arveid kokku</div>
       <div class="sc-value">${rows.length}</div>
       <div class="sc-sub">${Object.keys(rows.reduce((a,r)=>{a[r.client_id]=1;return a;},{})).length} klienti</div>
     </div>`);
   cards.push(`
-    <div class="stat-card pushed">
+    <div class="stat-card pushed clickable${act('pushed')}" data-status="pushed" title="Filtreeri: ainult Meritis">
       <div class="sc-label">✅ Meritis</div>
       <div class="sc-value">${by.pushed}</div>
       <div class="sc-sub">${fmtEur(pushedSum)}</div>
     </div>`);
   cards.push(`
-    <div class="stat-card duplicate">
+    <div class="stat-card duplicate clickable${act('duplicate')}" data-status="duplicate" title="Filtreeri: ainult duplikaadid">
       <div class="sc-label">♻️ Duplikaadid</div>
       <div class="sc-value">${by.duplicate}</div>
       <div class="sc-sub">Merit lükkas korduva tagasi</div>
     </div>`);
   cards.push(`
-    <div class="stat-card failed">
+    <div class="stat-card failed clickable${act('failed')}" data-status="failed" title="Filtreeri: ainult vead">
       <div class="sc-label">⚠️ Vead</div>
       <div class="sc-value">${by.failed}</div>
       <div class="sc-sub">vajavad käsitsi tähelepanu</div>
     </div>`);
   if (by.needs_review > 0) {
     cards.push(`
-      <div class="stat-card review">
+      <div class="stat-card review clickable${act('needs_review')}" data-status="needs_review" title="Filtreeri: ainult ülevaatus">
         <div class="sc-label">🔎 Ülevaatus</div>
         <div class="sc-value">${by.needs_review}</div>
         <div class="sc-sub">ootab kinnitust</div>
@@ -595,7 +606,10 @@ function renderStats(rows) {
 function renderClients(rows) {
   const container = document.getElementById('clients-container');
   if (rows.length === 0) {
-    container.innerHTML = '<div class="empty-msg">Selles perioodis pole ühtegi arvet liikunud.</div>';
+    const msg = statusFilter
+      ? `Selles perioodis pole "${statusMeta(statusFilter).label}" staatusega arveid.`
+      : 'Selles perioodis pole ühtegi arvet liikunud.';
+    container.innerHTML = `<div class="empty-msg">${escapeHtml(msg)}</div>`;
     return;
   }
 
@@ -728,6 +742,16 @@ function bindUIEvents() {
   });
   document.getElementById('refresh-btn').addEventListener('click', refresh);
   document.getElementById('client-search-input').addEventListener('input', applyClientFilter);
+
+  // Statistikakaardi-filter: klikk filtreerib nimekirja selle staatuse järgi;
+  // klikk aktiivsel kaardil (või "Arveid kokku") tühistab. Renderdab cache'ist, ei päri DB-d.
+  document.getElementById('stats-row').addEventListener('click', (e) => {
+    const card = e.target.closest('.stat-card.clickable');
+    if (!card) return;
+    const s = card.dataset.status;            // '' = kõik
+    statusFilter = (s === '') ? null : (statusFilter === s ? null : s);
+    render(currentRows);
+  });
 
   // Resend-nupud (delegatsioon — konteiner on püsiv, sisu uueneb iga refresh'iga)
   document.getElementById('clients-container').addEventListener('click', (e) => {
