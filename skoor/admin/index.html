@@ -1157,7 +1157,6 @@ function renderTaskRow(t, isSub, openKids) {
         ${isAdHoc ? '<span class="pill adhoc" style="margin-top:4px">🤘 käsitsi</span>' : ''}
         ${isCarried(t) ? `<span class="pill carried" style="margin-top:4px">⚠ ${escapeHtml(periodLabel(t.period))} · üle tähtaja</span>` : ''}
       </td>
-      <td class="col-priority"><span class="pill priority-${t.priority}">${priorityLabel(t.priority)}</span></td>
       <td class="col-status"><span class="pill status-${t.status}">${statusLabel(t.status)}</span></td>
       <td class="col-actions">
         <button class="btn-icon" data-edit="${t.id}" title="Muuda">✏</button>
