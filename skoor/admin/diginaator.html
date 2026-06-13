@@ -262,6 +262,23 @@
     .resend-btn:hover:not(:disabled) { color: var(--accent); background: rgba(16,185,129,0.14); }
     .resend-pending { color: var(--warn); font-size: 15px; line-height: 1; display: inline-block; animation: rspin 1.4s linear infinite; }
     @keyframes rspin { to { transform: rotate(360deg); } }
+    .review-btn {
+      background: var(--bg3); color: var(--text2);
+      width: 27px; height: 27px; border-radius: 6px;
+      font-size: 14px; line-height: 1; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .review-btn:hover { color: var(--accent); background: rgba(16,185,129,0.14); }
+    .review-done {
+      background: rgba(16,185,129,0.12); color: var(--accent);
+      border: none; cursor: pointer;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase;
+      padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+      display: inline-flex; align-items: center; gap: 3px;
+    }
+    .review-done:hover { background: rgba(156,163,175,0.18); color: var(--text2); }
+    .inv-row.resolved { opacity: 0.55; }
+    .inv-row.resolved:hover { opacity: 1; }
     .inv-error {
       grid-column: 1 / -1;
       background: rgba(239,68,68,0.08);
@@ -496,7 +513,7 @@ async function loadClients() {
 async function loadInbox() {
   const start = `${currentPeriod}-01`;
   const end   = `${shiftPeriod(currentPeriod, 1)}-01`;
-  const cols = 'id, client_id, vendor_name, vendor_reg_no, invoice_no, invoice_date, total, currency, status, doc_type, merit_doc_id, drive_pdf_id, drive_original_id, error_message, confidence, received_at, created_at, source_message_id, resend_requested, resend_done, resend_error';
+  const cols = 'id, client_id, vendor_name, vendor_reg_no, invoice_no, invoice_date, total, currency, status, doc_type, merit_doc_id, drive_pdf_id, drive_original_id, error_message, confidence, received_at, created_at, source_message_id, resend_requested, resend_done, resend_error, reviewed_at, reviewed_by';
   let q = sb.from('purchase_inbox').select(cols);
   if (periodBasis === 'invoice_date') {
     // Arve kuupäeva järgi + selles kuus töödeldud kuupäevata arved (vead/duplikaadid),
@@ -542,21 +559,43 @@ async function requestResend(id, label) {
   await refresh();
 }
 
+// "✓ Korras": märgib needs_review/failed rea lahendatuks (reviewed_at) → kaob avatud
+// loendist/kaardilt, jääb "Arveid kokku" alla halli ✓-märgisega. Tagasivõetav (undo).
+async function setReviewed(id, done) {
+  const { error } = await sb.from('purchase_inbox')
+    .update({ reviewed_at: done ? new Date().toISOString() : null, reviewed_by: done ? currentUser.id : null })
+    .eq('id', id);
+  if (error) { showToast('Ei õnnestunud: ' + error.message, 'error'); return; }
+  showToast(done ? 'Märgitud lahendatuks ✓' : 'Tagasi võetud.', 'success');
+  await refresh();
+}
+
 // ── Render ──────────────────────────────────────────────────────
 function render(rows) {
   currentRows = rows;
   renderStats(rows);                                   // kaardid = kogu perioodi arvud
-  renderClients(statusFilter ? rows.filter(r => r.status === statusFilter) : rows);
+  renderClients(rows.filter(matchesFilter));
+}
+
+// Statistikakaardi-filter. needs_review/failed all näita ainult AVATUD (lahendamata) ridu —
+// lahendatud (reviewed_at) jäävad nähtavale ainult "Arveid kokku" all halli ✓-märgisega.
+function matchesFilter(r) {
+  if (!statusFilter) return true;
+  if (r.status !== statusFilter) return false;
+  if ((statusFilter === 'needs_review' || statusFilter === 'failed') && r.reviewed_at) return false;
+  return true;
 }
 
 function renderStats(rows) {
   const by = { pushed: 0, duplicate: 0, failed: 0, needs_review: 0, other: 0 };
+  const open = { failed: 0, needs_review: 0 };   // lahendamata (reviewed_at is null) — "vajab tähelepanu"
   let pushedSum = 0;
   rows.forEach(r => {
     if (r.status in by) by[r.status]++; else by.other++;
     if (r.status === 'pushed' && r.total != null) pushedSum += Number(r.total) || 0;
+    if (!r.reviewed_at && (r.status === 'failed' || r.status === 'needs_review')) open[r.status]++;
   });
-  const decided = by.pushed + by.failed;
+  const decided = by.pushed + by.failed;   // õnnestumismäär = töötlemise tulemus (kõik vead loevad)
   const successRate = decided > 0 ? Math.round((by.pushed / decided) * 100) : null;
 
   const cards = [];
@@ -580,16 +619,16 @@ function renderStats(rows) {
       <div class="sc-sub">Merit lükkas korduva tagasi</div>
     </div>`);
   cards.push(`
-    <div class="stat-card failed clickable${act('failed')}" data-status="failed" title="Filtreeri: ainult vead">
+    <div class="stat-card failed clickable${act('failed')}" data-status="failed" title="Filtreeri: ainult lahendamata vead">
       <div class="sc-label">⚠️ Vead</div>
-      <div class="sc-value">${by.failed}</div>
+      <div class="sc-value">${open.failed}</div>
       <div class="sc-sub">vajavad käsitsi tähelepanu</div>
     </div>`);
-  if (by.needs_review > 0) {
+  if (open.needs_review > 0) {
     cards.push(`
-      <div class="stat-card review clickable${act('needs_review')}" data-status="needs_review" title="Filtreeri: ainult ülevaatus">
+      <div class="stat-card review clickable${act('needs_review')}" data-status="needs_review" title="Filtreeri: ainult lahendamata ülevaatus">
         <div class="sc-label">🔎 Ülevaatus</div>
-        <div class="sc-value">${by.needs_review}</div>
+        <div class="sc-value">${open.needs_review}</div>
         <div class="sc-sub">ootab kinnitust</div>
       </div>`);
   }
@@ -606,9 +645,17 @@ function renderStats(rows) {
 function renderClients(rows) {
   const container = document.getElementById('clients-container');
   if (rows.length === 0) {
-    const msg = statusFilter
-      ? `Selles perioodis pole "${statusMeta(statusFilter).label}" staatusega arveid.`
-      : 'Selles perioodis pole ühtegi arvet liikunud.';
+    let msg;
+    if (statusFilter) {
+      const lbl = statusMeta(statusFilter).label;
+      const hasResolved = (statusFilter === 'needs_review' || statusFilter === 'failed') &&
+        currentRows.some(r => r.status === statusFilter && r.reviewed_at);
+      msg = hasResolved
+        ? `Kõik "${lbl}" read on lahendatud ✓.`
+        : `Selles perioodis pole "${lbl}" staatusega arveid.`;
+    } else {
+      msg = 'Selles perioodis pole ühtegi arvet liikunud.';
+    }
     container.innerHTML = `<div class="empty-msg">${escapeHtml(msg)}</div>`;
     return;
   }
@@ -654,7 +701,10 @@ function renderClientBlock(clientId, items) {
   const counts = { pushed: 0, duplicate: 0, failed: 0, needs_review: 0, other: 0 };
   let sum = 0;
   items.forEach(r => {
-    if (r.status in counts) counts[r.status]++; else counts.other++;
+    // failed/needs_review chip loeb ainult avatud (lahendamata) ridu — kooskõlas kaartidega
+    if (r.status === 'failed' || r.status === 'needs_review') {
+      if (!r.reviewed_at) counts[r.status]++;
+    } else if (r.status in counts) counts[r.status]++; else counts.other++;
     if (r.status === 'pushed' && r.total != null) sum += Number(r.total) || 0;
   });
 
@@ -688,24 +738,33 @@ function renderInvoiceRow(r) {
   const dtBadge = (dt === 'arve' || dt === 'kviitung' || dt === 'muu')
     ? `<span class="dt dt-${dt}" title="DiginaatoR tuvastas dokumendi liigi">${dt}</span>` : '';
 
-  // Resend: ootel kui lipp seatud ja veel töötlemata; nupp ainult mitte-pushed ridadel millel on Gmaili allikas
+  const isResolved  = !!r.reviewed_at;
+  const isAttention = r.status === 'needs_review' || r.status === 'failed';
+
+  // Resend: ootel kui lipp seatud ja veel töötlemata; nupp ainult mitte-pushed/mitte-lahendatud ridadel millel on Gmaili allikas
   const resendPending = !!r.resend_requested &&
     (!r.resend_done || new Date(r.resend_done) < new Date(r.resend_requested));
-  const canResend = r.status !== 'pushed' && !!r.source_message_id && !resendPending;
+  const canResend = r.status !== 'pushed' && !!r.source_message_id && !resendPending && !isResolved;
   const resendLabel = r.vendor_name || 'see dokument';
+  const reviewBtn = isResolved
+    ? `<button class="review-done" data-id="${escapeHtml(r.id)}" data-action="undo" title="Lahendatud ${fmtDateTime(r.reviewed_at)} — klikk võtab tagasi">✓ Korras</button>`
+    : (isAttention
+        ? `<button class="review-btn" data-id="${escapeHtml(r.id)}" data-action="done" title="Märgi lahendatuks (eemaldab avatud loendist)">✓</button>`
+        : '');
   const actions = `
         ${link ? `<a href="${link}" target="_blank" rel="noopener" title="Ava arhiveeritud PDF Drive'is">📄</a>` : ''}
         ${resendPending
           ? `<span class="resend-pending" title="Saadan uuesti — värskenda peagi">↻</span>`
           : canResend
             ? `<button class="resend-btn" data-id="${escapeHtml(r.id)}" data-label="${escapeHtml(resendLabel)}" title="Saada see dokument Gmailist uuesti Meritisse">↻</button>`
-            : ''}`;
+            : ''}
+        ${reviewBtn}`;
 
   const errMsg = (r.status === 'failed' && r.error_message) ? r.error_message : (r.resend_error || '');
   const errorLine = errMsg ? `<div class="inv-error">⚠️ ${escapeHtml(errMsg)}</div>` : '';
 
   return `
-    <div class="inv-row">
+    <div class="inv-row${isResolved ? ' resolved' : ''}">
       <span><span class="pill ${meta.cls}">${meta.icon} ${escapeHtml(meta.label)}</span></span>
       <span class="inv-vendor">${vendor}${dtBadge}${invNo}</span>
       <span class="inv-amount">${r.total != null ? fmtEur(r.total, r.currency) : '<span style="color:var(--text3)">—</span>'}</span>
@@ -755,10 +814,10 @@ function bindUIEvents() {
 
   // Resend-nupud (delegatsioon — konteiner on püsiv, sisu uueneb iga refresh'iga)
   document.getElementById('clients-container').addEventListener('click', (e) => {
-    const btn = e.target.closest('.resend-btn');
-    if (!btn) return;
-    e.stopPropagation();
-    requestResend(btn.dataset.id, btn.dataset.label);
+    const resend = e.target.closest('.resend-btn');
+    if (resend) { e.stopPropagation(); requestResend(resend.dataset.id, resend.dataset.label); return; }
+    const review = e.target.closest('.review-btn, .review-done');
+    if (review) { e.stopPropagation(); setReviewed(review.dataset.id, review.dataset.action === 'done'); return; }
   });
 
   document.querySelectorAll('.basis-btn').forEach(btn => {
