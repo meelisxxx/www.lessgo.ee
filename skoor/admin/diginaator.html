@@ -249,6 +249,7 @@
     .dt-arve     { background: rgba(16,185,129,0.15); color: var(--accent); }
     .dt-kviitung { background: rgba(245,158,11,0.15);  color: var(--warn); }
     .dt-muu      { background: var(--bg3);             color: var(--text2); }
+    .dt-meeldetuletus { background: rgba(239,68,68,0.15); color: var(--neg); }
     .konto { display: block; margin-top: 2px; font-size: 11px; font-weight: 400; color: var(--text3); }
     .konto b { font-weight: 600; color: var(--text2); }
     .inv-amount { text-align: right; font-variant-numeric: tabular-nums; }
@@ -747,8 +748,8 @@ function renderInvoiceRow(r) {
   const vendor = r.vendor_name ? escapeHtml(r.vendor_name) : '<span style="color:var(--text3)">tarnija tundmatu</span>';
   const invNo = r.invoice_no ? `<span class="inv-no">arve nr ${escapeHtml(String(r.invoice_no).slice(0, 40))}</span>` : '';
   const dt = r.doc_type;
-  const dtBadge = (dt === 'arve' || dt === 'kviitung' || dt === 'muu')
-    ? `<span class="dt dt-${dt}" title="DiginaatoR tuvastas dokumendi liigi">${dt}</span>` : '';
+  const dtBadge = (dt === 'arve' || dt === 'kviitung' || dt === 'muu' || dt === 'meeldetuletus')
+    ? `<span class="dt dt-${dt}" title="${dt === 'meeldetuletus' ? 'Maksemeeldetuletus — ei lähe Meritisse, oota päris arvet' : 'DiginaatoR tuvastas dokumendi liigi'}">${dt}</span>` : '';
 
   // DiginaatoR pakutud kuluKonto (Eve kinnitab Meritis). extracted.gl_account_code/gl_confidence.
   const ex = r.extracted || {};
