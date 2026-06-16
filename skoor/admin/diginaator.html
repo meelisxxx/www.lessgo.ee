@@ -751,13 +751,21 @@ function renderInvoiceRow(r) {
   const dtBadge = (dt === 'arve' || dt === 'kviitung' || dt === 'muu' || dt === 'meeldetuletus')
     ? `<span class="dt dt-${dt}" title="${dt === 'meeldetuletus' ? 'Maksemeeldetuletus — ei lähe Meritisse, oota päris arvet' : 'DiginaatoR tuvastas dokumendi liigi'}">${dt}</span>` : '';
 
-  // DiginaatoR pakutud kuluKonto (Eve kinnitab Meritis). extracted.gl_account_code/gl_confidence.
+  // DiginaatoR kuluKonto (Eve kinnitab Meritis). Kiht 2: extracted._gl = {code, source, suggested, conf}
+  // (source: 'rule' = õpitud tarnija-reegel, 'llm' = Gemini pakkumine). Fallback vanadele: gl_account_code.
   const ex = r.extracted || {};
-  const glc = ex.gl_account_code ? String(ex.gl_account_code).trim() : '';
-  const glConf = (ex.gl_confidence != null && ex.gl_confidence !== '') ? Number(ex.gl_confidence) : null;
+  const gl = ex._gl || null;
+  const glc = gl ? String(gl.code || '').trim() : (ex.gl_account_code ? String(ex.gl_account_code).trim() : '');
+  const glConf = gl ? (gl.conf != null ? Number(gl.conf) : null)
+                    : ((ex.gl_confidence != null && ex.gl_confidence !== '') ? Number(ex.gl_confidence) : null);
+  const glSource = gl ? gl.source : null;
   const glName = glc ? (glMap[glc] || '') : '';
+  const srcIcon = glSource === 'rule' ? '🔒 ' : (glSource === 'llm' ? '🤖 ' : '');
+  const srcTitle = glSource === 'rule'
+    ? 'Tarnija reegel — õpitud Eve varasematest Meriti-kinnitustest'
+    : `DiginaatoR pakkus kuluKonto${glConf != null ? ` (kindlus ${Math.round(glConf * 100)}%)` : ''} — Eve kinnitab Meritis`;
   const kontoBadge = glc
-    ? `<span class="konto" title="DiginaatoR pakkus kuluKonto${glConf != null ? ` (kindlus ${Math.round(glConf * 100)}%)` : ''} — Eve kinnitab Meritis">konto <b>${escapeHtml(glc)}</b>${glName ? ' · ' + escapeHtml(glName) : ''}</span>`
+    ? `<span class="konto" title="${srcTitle}">${srcIcon}konto <b>${escapeHtml(glc)}</b>${glName ? ' · ' + escapeHtml(glName) : ''}</span>`
     : '';
 
   const isResolved  = !!r.reviewed_at;
