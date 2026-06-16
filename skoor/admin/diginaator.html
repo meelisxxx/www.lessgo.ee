@@ -767,6 +767,11 @@ function renderInvoiceRow(r) {
   const kontoBadge = glc
     ? `<span class="konto" title="${srcTitle}">${srcIcon}konto <b>${escapeHtml(glc)}</b>${glName ? ' · ' + escapeHtml(glName) : ''}</span>`
     : '';
+  // Kiht 3: õpitud maksukood (nt sõiduauto osaline KM) — kuva ainult kui reeglist ja eri-kood (mitte tavaline X% käibemaks)
+  const taxName = (gl && gl.taxSource === 'rule' && gl.taxName) ? String(gl.taxName) : '';
+  const taxBadge = (taxName && !/^\d+%/.test(taxName.trim()))
+    ? `<span class="konto" title="Õpitud maksukood — Eve varasematest kinnitustest (nt sõiduauto osaline käibemaks)">🚗 ${escapeHtml(taxName)}</span>`
+    : '';
 
   const isResolved  = !!r.reviewed_at;
   const isAttention = r.status === 'needs_review' || r.status === 'failed';
@@ -796,7 +801,7 @@ function renderInvoiceRow(r) {
   return `
     <div class="inv-row${isResolved ? ' resolved' : ''}">
       <span><span class="pill ${meta.cls}">${meta.icon} ${escapeHtml(meta.label)}</span></span>
-      <span class="inv-vendor">${vendor}${dtBadge}${invNo}${kontoBadge}</span>
+      <span class="inv-vendor">${vendor}${dtBadge}${invNo}${kontoBadge}${taxBadge}</span>
       <span class="inv-amount">${r.total != null ? fmtEur(r.total, r.currency) : '<span style="color:var(--text3)">—</span>'}</span>
       <span class="inv-date">${r.invoice_date ? fmtDate(r.invoice_date) : '—'}</span>
       <span class="inv-meta" title="Töödeldud ${fmtDateTime(r.created_at)}">${fmtDateTime(r.created_at)}</span>
