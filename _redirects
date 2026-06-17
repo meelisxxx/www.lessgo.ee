@@ -1,0 +1,3 @@
+# Skoor admin → work tee-ümbernimetus (2026-06-17).
+# Hoiab vanad järjehoidjad + n8n emaili-lingid + väljasaadetud lingid töös.
+/skoor/admin/* /skoor/work/:splat 301
