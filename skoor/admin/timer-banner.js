@@ -49,11 +49,18 @@
       </div>
       <button class="btn-danger" data-tb-stop>⏹ Stop</button>
     `;
-    const header = document.querySelector('header');
-    if (header && header.parentNode) {
-      header.parentNode.insertBefore(banner, header.nextSibling);
+    // Sidebar-layout: pane bänner <main> etteotsa. Fallback vanale
+    // header-layout'ile ja viimaks body algusesse.
+    const main = document.querySelector('#app main') || document.querySelector('main');
+    if (main) {
+      main.insertBefore(banner, main.firstChild);
     } else {
-      document.body.insertBefore(banner, document.body.firstChild);
+      const header = document.querySelector('header');
+      if (header && header.parentNode) {
+        header.parentNode.insertBefore(banner, header.nextSibling);
+      } else {
+        document.body.insertBefore(banner, document.body.firstChild);
+      }
     }
 
     const modal = document.createElement('div');
