@@ -23,6 +23,7 @@
     { file: 'clients.html',    label: 'Kliendid' },
     { file: 'templates.html',  label: 'Mallid' },
     { file: 'diginaator.html', label: 'DiginaatoR' },
+    { file: 'pdf.html',        label: 'PDF' },
     { file: 'settings.html',   label: 'Seaded' },
   ];
 

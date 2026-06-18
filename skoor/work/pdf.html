@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Skoor Admin — PDF</title>
+  <script>(function(){try{const t=localStorage.getItem('skoor-theme')||'system';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="timer-banner.css">
+  <script src="timer-banner.js" defer></script>
+  <link rel="icon" type="image/svg+xml" href="../skoor-favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <!-- PDF-tööriistad — vendor'itud, kõik brauseris, midagi ei lahku arvutist -->
+  <script src="vendor/pdf-lib/pdf-lib.min.js" defer></script>
+  <script src="vendor/jszip/jszip.min.js" defer></script>
+  <script src="vendor/heic2any/heic2any.min.js" defer></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #111827;
+      --bg2:      #1f2937;
+      --bg3:      #374151;
+      --border:   rgba(255,255,255,0.08);
+      --text:     #f9fafb;
+      --text2:    #9ca3af;
+      --text3:    #6b7280;
+      --accent:   #10b981;
+      --pos:      #10b981;
+      --neg:      #ef4444;
+      --warn:     #f59e0b;
+      --info:     #818cf8;
+      --radius:   12px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { opacity: 0.8; }
+
+    #loading-screen, #denied-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      text-align: center;
+    }
+    #denied-screen h2 { color: var(--neg); margin-bottom: 12px; }
+    #denied-screen p { color: var(--text2); margin-bottom: 24px; }
+
+    .nav-link {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text2);
+      font-size: 13px;
+    }
+    .nav-link:hover { color: var(--text); border-color: var(--text2); opacity: 1; }
+
+    #app { display: none; flex-direction: column; min-height: 100vh; }
+
+    button {
+      cursor: pointer;
+      font-family: inherit;
+      border: none;
+      border-radius: 8px;
+      transition: opacity 0.2s, background 0.2s, border-color 0.2s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-secondary {
+      background: var(--bg3);
+      color: var(--text);
+      padding: 8px 14px;
+      font-size: 13px;
+    }
+    .btn-secondary:hover:not(:disabled) { background: var(--hover-strong); }
+
+    main { padding: 24px; max-width: 760px; margin: 0 auto; width: 100%; }
+
+    .page-head { margin-bottom: 20px; }
+    .page-head h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    .page-head p { font-size: 14px; color: var(--text2); }
+    .privacy-note {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 10px;
+      font-size: 12.5px; color: var(--text3);
+      background: rgba(16,185,129,0.07);
+      border: 1px solid rgba(16,185,129,0.2);
+      border-radius: 999px; padding: 5px 12px;
+    }
+
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      margin-bottom: 20px;
+    }
+    .card h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text2);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .card p.subtitle {
+      font-size: 13px;
+      color: var(--text3);
+      margin-bottom: 16px;
+    }
+
+    /* Dropzone */
+    .dropzone {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 6px;
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 28px 18px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      color: var(--text2);
+    }
+    .dropzone:hover { border-color: var(--text3); background: var(--hover-soft); }
+    .dropzone.dragover { border-color: var(--accent); background: rgba(16,185,129,0.08); }
+    .dropzone .dz-icon { font-size: 30px; }
+    .dropzone .dz-main { font-size: 14px; font-weight: 600; color: var(--text); }
+    .dropzone .dz-sub { font-size: 12px; color: var(--text3); }
+    .dropzone input[type="file"] { display: none; }
+
+    /* File list */
+    .file-list { list-style: none; margin: 14px 0 0; display: flex; flex-direction: column; gap: 6px; }
+    .file-item {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--bg3);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 13.5px;
+    }
+    .file-item .fi-idx { color: var(--text3); font-variant-numeric: tabular-nums; min-width: 20px; text-align: right; }
+    .file-item .fi-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-item .fi-size { color: var(--text3); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .file-item .fi-btn {
+      background: transparent; color: var(--text3);
+      padding: 2px 6px; font-size: 14px; border-radius: 5px; line-height: 1;
+    }
+    .file-item .fi-btn:hover:not(:disabled) { background: var(--hover-strong); color: var(--text); }
+    .file-item .fi-btn:disabled { opacity: 0.25; cursor: default; }
+    .file-item .fi-btn.del:hover { color: var(--neg); }
+
+    /* Segmented toggle */
+    .segmented { display: inline-flex; background: var(--bg3); border-radius: 8px; padding: 3px; gap: 3px; margin: 16px 0 0; }
+    .segmented button {
+      background: transparent; color: var(--text2);
+      padding: 7px 14px; font-size: 13px; font-weight: 500; border-radius: 6px;
+    }
+    .segmented button.active { background: var(--accent); color: #fff; }
+
+    .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+    .row label { font-size: 13px; color: var(--text2); }
+    input[type="text"] {
+      background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 8px 12px; font-size: 13.5px; font-family: inherit;
+    }
+    input[type="text"]:focus { outline: none; border-color: var(--accent); }
+
+    .status { font-size: 13px; margin-top: 12px; min-height: 18px; }
+    .status.working { color: var(--info); }
+    .status.done { color: var(--pos); }
+    .status.error { color: var(--neg); }
+
+    @media (max-width: 540px) {
+      main { padding: 16px; }
+      .card { padding: 18px 16px; }
+      .page-head h1 { font-size: 19px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading-screen" style="display:flex">
+  <p style="color: var(--text2)">Laen...</p>
+</div>
+
+<div id="denied-screen">
+  <h2>Ligipääs keelatud</h2>
+  <p>Sul pole admin õigusi.</p>
+  <a href="../" class="nav-link">← Skoor avalehele</a>
+</div>
+
+<div id="app">
+  <script src="nav.js"></script>
+
+  <main>
+
+    <div class="page-head">
+      <h1>PDF-tööriistad</h1>
+      <p>Tee piltidest PDF-e, liida PDF-id kokku või võta PDF lehtede kaupa lahti.</p>
+      <span class="privacy-note">🔒 Kõik toimub sinu brauseris — failid ei lahku arvutist.</span>
+    </div>
+
+    <!-- ───────────── 1. Pildid → PDF-id ───────────── -->
+    <div class="card" id="tool-img">
+      <h2>Pildid → PDF</h2>
+      <p class="subtitle">Lohista pildid (JPG, PNG, HEIC…). Vali, kas iga pilt saab oma PDF-i või lähevad kõik ühte PDF-i.</p>
+
+      <label class="dropzone" data-dz="img">
+        <span class="dz-icon">🖼️</span>
+        <span class="dz-main">Lohista pildid siia või klõpsa</span>
+        <span class="dz-sub">JPG · PNG · HEIC · WEBP · mitu korraga</span>
+        <input type="file" accept="image/*,.heic,.heif" multiple>
+      </label>
+
+      <ul class="file-list" id="img-list"></ul>
+
+      <div class="segmented" id="img-mode">
+        <button data-mode="separate" class="active">Iga pilt eraldi PDF</button>
+        <button data-mode="combined">Üks ühine PDF</button>
+      </div>
+
+      <div class="row" id="img-combined-name" style="display:none">
+        <label>Faili nimi:</label>
+        <input type="text" id="img-out-name" value="pildid.pdf">
+      </div>
+
+      <div class="row">
+        <button class="btn-primary" id="img-go" disabled>Tee PDF</button>
+        <button class="btn-secondary" id="img-clear" style="display:none">Tühjenda</button>
+      </div>
+      <div class="status" id="img-status"></div>
+    </div>
+
+    <!-- ───────────── 2. PDF-ide liitmine ───────────── -->
+    <div class="card" id="tool-merge">
+      <h2>Liida PDF-id</h2>
+      <p class="subtitle">Lisa mitu PDF-i ja liida need üheks. Järjekorda saad muuta nooltega.</p>
+
+      <label class="dropzone" data-dz="merge">
+        <span class="dz-icon">📎</span>
+        <span class="dz-main">Lohista PDF-id siia või klõpsa</span>
+        <span class="dz-sub">Liidetakse nimekirja järjekorras</span>
+        <input type="file" accept="application/pdf,.pdf" multiple>
+      </label>
+
+      <ul class="file-list" id="merge-list"></ul>
+
+      <div class="row">
+        <label>Faili nimi:</label>
+        <input type="text" id="merge-out-name" value="liidetud.pdf">
+      </div>
+
+      <div class="row">
+        <button class="btn-primary" id="merge-go" disabled>Liida PDF-id</button>
+        <button class="btn-secondary" id="merge-clear" style="display:none">Tühjenda</button>
+      </div>
+      <div class="status" id="merge-status"></div>
+    </div>
+
+    <!-- ───────────── 3. PDF lahti võtmine ───────────── -->
+    <div class="card" id="tool-split">
+      <h2>Võta PDF lahti</h2>
+      <p class="subtitle">Vali üks PDF — iga leht tuleb eraldi PDF-failina (mitme lehe puhul ZIP-ina).</p>
+
+      <label class="dropzone" data-dz="split">
+        <span class="dz-icon">✂️</span>
+        <span class="dz-main">Lohista PDF siia või klõpsa</span>
+        <span class="dz-sub">Üks fail korraga</span>
+        <input type="file" accept="application/pdf,.pdf">
+      </label>
+
+      <ul class="file-list" id="split-list"></ul>
+
+      <div class="row">
+        <button class="btn-primary" id="split-go" disabled>Võta lahti</button>
+        <button class="btn-secondary" id="split-clear" style="display:none">Tühjenda</button>
+      </div>
+      <div class="status" id="split-status"></div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const SUPABASE_URL  = 'https://lpehwgpitfowhyiaxrhe.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_Y5pG6JcaFE5OFXlpgH9q-Q_B-mW504U';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let currentUser = null;
+
+/* ───────────── Üldised abifunktsioonid ───────────── */
+function fmtSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+}
+function baseName(name) { return name.replace(/\.[^.]+$/, ''); }
+function pad(n, width) { return String(n).padStart(width, '0'); }
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+function setStatus(el, msg, cls) {
+  el.textContent = msg || '';
+  el.className = 'status' + (cls ? ' ' + cls : '');
+}
+
+const HEIC_RE = /\.(heic|heif)$/i;
+function isHeic(file) {
+  return HEIC_RE.test(file.name) || file.type === 'image/heic' || file.type === 'image/heif';
+}
+
+/* Loe pildi (mis tahes vorming) pdf-lib jaoks: tagastab {bytes, kind:'jpg'|'png'} */
+async function imageToBytes(file) {
+  let blob = file;
+  // HEIC → JPEG
+  if (isHeic(file)) {
+    const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+    blob = Array.isArray(out) ? out[0] : out;
+  }
+  const type = blob.type || '';
+  if (type === 'image/jpeg' || /\.jpe?g$/i.test(file.name)) {
+    return { bytes: new Uint8Array(await blob.arrayBuffer()), kind: 'jpg' };
+  }
+  if (type === 'image/png' || /\.png$/i.test(file.name)) {
+    return { bytes: new Uint8Array(await blob.arrayBuffer()), kind: 'png' };
+  }
+  // Muu (webp, gif, bmp…) → canvas → PNG
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement('canvas');
+  canvas.width = bitmap.width; canvas.height = bitmap.height;
+  canvas.getContext('2d').drawImage(bitmap, 0, 0);
+  const pngBlob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+  return { bytes: new Uint8Array(await pngBlob.arrayBuffer()), kind: 'png' };
+}
+
+const A4 = { w: 595.28, h: 841.89 };
+const MARGIN = 18;
+/* Joonista pilt A4-lehele (auto-orientatsioon, tsentreeritud) */
+function drawImageOnPage(pdfDoc, img) {
+  const landscape = img.width > img.height;
+  const pageW = landscape ? A4.h : A4.w;
+  const pageH = landscape ? A4.w : A4.h;
+  const page = pdfDoc.addPage([pageW, pageH]);
+  const maxW = pageW - MARGIN * 2, maxH = pageH - MARGIN * 2;
+  const scale = Math.min(maxW / img.width, maxH / img.height);
+  const w = img.width * scale, h = img.height * scale;
+  page.drawImage(img, { x: (pageW - w) / 2, y: (pageH - h) / 2, width: w, height: h });
+}
+async function embedImage(pdfDoc, file) {
+  const { bytes, kind } = await imageToBytes(file);
+  return kind === 'jpg' ? await pdfDoc.embedJpg(bytes) : await pdfDoc.embedPng(bytes);
+}
+
+/* ───────────── Korduvkasutatav failinimekirja-kontroller ───────────── */
+function makeFileController(opts) {
+  // opts: { dzKey, listEl, onChange, multiple, reorder }
+  const dz = document.querySelector(`[data-dz="${opts.dzKey}"]`);
+  const input = dz.querySelector('input[type="file"]');
+  const listEl = document.getElementById(opts.listEl);
+  let files = [];
+
+  function render() {
+    listEl.innerHTML = '';
+    files.forEach((f, i) => {
+      const li = document.createElement('li');
+      li.className = 'file-item';
+      let controls = '';
+      if (opts.reorder) {
+        controls += `<button class="fi-btn up" data-i="${i}" ${i === 0 ? 'disabled' : ''} title="Üles">▲</button>`;
+        controls += `<button class="fi-btn down" data-i="${i}" ${i === files.length - 1 ? 'disabled' : ''} title="Alla">▼</button>`;
+      }
+      controls += `<button class="fi-btn del" data-i="${i}" title="Eemalda">✕</button>`;
+      li.innerHTML =
+        `<span class="fi-idx">${i + 1}.</span>` +
+        `<span class="fi-name" title="${f.name}">${f.name}</span>` +
+        `<span class="fi-size">${fmtSize(f.size)}</span>` + controls;
+      listEl.appendChild(li);
+    });
+    opts.onChange(files);
+  }
+
+  function add(newFiles) {
+    const arr = Array.from(newFiles);
+    if (!arr.length) return;
+    files = opts.multiple ? files.concat(arr) : [arr[0]];
+    render();
+  }
+  function clear() { files = []; render(); }
+
+  // klõps + drag-drop
+  dz.addEventListener('click', (e) => { if (e.target !== input) input.click(); });
+  input.addEventListener('change', () => { add(input.files); input.value = ''; });
+  dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+  dz.addEventListener('drop', (e) => {
+    e.preventDefault(); dz.classList.remove('dragover');
+    if (e.dataTransfer.files.length) add(e.dataTransfer.files);
+  });
+
+  listEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('.fi-btn');
+    if (!btn) return;
+    const i = +btn.dataset.i;
+    if (btn.classList.contains('del')) files.splice(i, 1);
+    else if (btn.classList.contains('up')) [files[i - 1], files[i]] = [files[i], files[i - 1]];
+    else if (btn.classList.contains('down')) [files[i + 1], files[i]] = [files[i], files[i + 1]];
+    render();
+  });
+
+  return { get: () => files, clear };
+}
+
+/* ───────────── 1. Pildid → PDF-id ───────────── */
+function initImageTool() {
+  const status = document.getElementById('img-status');
+  const goBtn = document.getElementById('img-go');
+  const clearBtn = document.getElementById('img-clear');
+  const modeWrap = document.getElementById('img-mode');
+  const combinedNameRow = document.getElementById('img-combined-name');
+  let mode = 'separate';
+
+  const ctrl = makeFileController({
+    dzKey: 'img', listEl: 'img-list', multiple: true, reorder: true,
+    onChange: (files) => {
+      goBtn.disabled = files.length === 0;
+      clearBtn.style.display = files.length ? '' : 'none';
+      setStatus(status, '');
+    }
+  });
+
+  modeWrap.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    mode = b.dataset.mode;
+    modeWrap.querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+    combinedNameRow.style.display = mode === 'combined' ? '' : 'none';
+  });
+
+  clearBtn.addEventListener('click', () => ctrl.clear());
+
+  goBtn.addEventListener('click', async () => {
+    const files = ctrl.get();
+    if (!files.length) return;
+    goBtn.disabled = true;
+    const { PDFDocument } = PDFLib;
+    try {
+      if (mode === 'combined') {
+        const pdf = await PDFDocument.create();
+        for (let i = 0; i < files.length; i++) {
+          setStatus(status, `Töötlen pilti ${i + 1}/${files.length}…`, 'working');
+          drawImageOnPage(pdf, await embedImage(pdf, files[i]));
+        }
+        const bytes = await pdf.save();
+        let name = (document.getElementById('img-out-name').value || 'pildid.pdf').trim();
+        if (!/\.pdf$/i.test(name)) name += '.pdf';
+        downloadBlob(new Blob([bytes], { type: 'application/pdf' }), name);
+        setStatus(status, `✓ Valmis — ${files.length} pilti ühes PDF-is.`, 'done');
+      } else {
+        // eraldi PDF iga pildi kohta
+        const outputs = [];
+        for (let i = 0; i < files.length; i++) {
+          setStatus(status, `Töötlen pilti ${i + 1}/${files.length}…`, 'working');
+          const pdf = await PDFDocument.create();
+          drawImageOnPage(pdf, await embedImage(pdf, files[i]));
+          outputs.push({ name: baseName(files[i].name) + '.pdf', bytes: await pdf.save() });
+        }
+        if (outputs.length === 1) {
+          downloadBlob(new Blob([outputs[0].bytes], { type: 'application/pdf' }), outputs[0].name);
+          setStatus(status, '✓ Valmis — 1 PDF.', 'done');
+        } else {
+          setStatus(status, 'Pakin ZIP-i…', 'working');
+          const zip = new JSZip();
+          outputs.forEach(o => zip.file(o.name, o.bytes));
+          downloadBlob(await zip.generateAsync({ type: 'blob' }), 'pildid-pdf.zip');
+          setStatus(status, `✓ Valmis — ${outputs.length} PDF-i ZIP-failis.`, 'done');
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setStatus(status, '✗ Viga: ' + (err.message || err), 'error');
+    } finally {
+      goBtn.disabled = ctrl.get().length === 0;
+    }
+  });
+}
+
+/* ───────────── 2. PDF-ide liitmine ───────────── */
+function initMergeTool() {
+  const status = document.getElementById('merge-status');
+  const goBtn = document.getElementById('merge-go');
+  const clearBtn = document.getElementById('merge-clear');
+
+  const ctrl = makeFileController({
+    dzKey: 'merge', listEl: 'merge-list', multiple: true, reorder: true,
+    onChange: (files) => {
+      goBtn.disabled = files.length < 1;
+      clearBtn.style.display = files.length ? '' : 'none';
+      setStatus(status, '');
+    }
+  });
+
+  clearBtn.addEventListener('click', () => ctrl.clear());
+
+  goBtn.addEventListener('click', async () => {
+    const files = ctrl.get();
+    if (files.length < 1) return;
+    goBtn.disabled = true;
+    const { PDFDocument } = PDFLib;
+    try {
+      const merged = await PDFDocument.create();
+      for (let i = 0; i < files.length; i++) {
+        setStatus(status, `Liidan ${i + 1}/${files.length}…`, 'working');
+        const src = await PDFDocument.load(await files[i].arrayBuffer());
+        const pages = await merged.copyPages(src, src.getPageIndices());
+        pages.forEach(p => merged.addPage(p));
+      }
+      const bytes = await merged.save();
+      let name = (document.getElementById('merge-out-name').value || 'liidetud.pdf').trim();
+      if (!/\.pdf$/i.test(name)) name += '.pdf';
+      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), name);
+      setStatus(status, `✓ Valmis — ${files.length} faili liidetud (${merged.getPageCount()} lehte).`, 'done');
+    } catch (err) {
+      console.error(err);
+      setStatus(status, '✗ Viga: ' + (err.message || err), 'error');
+    } finally {
+      goBtn.disabled = ctrl.get().length < 1;
+    }
+  });
+}
+
+/* ───────────── 3. PDF lahti võtmine ───────────── */
+function initSplitTool() {
+  const status = document.getElementById('split-status');
+  const goBtn = document.getElementById('split-go');
+  const clearBtn = document.getElementById('split-clear');
+
+  const ctrl = makeFileController({
+    dzKey: 'split', listEl: 'split-list', multiple: false, reorder: false,
+    onChange: (files) => {
+      goBtn.disabled = files.length === 0;
+      clearBtn.style.display = files.length ? '' : 'none';
+      setStatus(status, '');
+    }
+  });
+
+  clearBtn.addEventListener('click', () => ctrl.clear());
+
+  goBtn.addEventListener('click', async () => {
+    const files = ctrl.get();
+    if (!files.length) return;
+    goBtn.disabled = true;
+    const { PDFDocument } = PDFLib;
+    try {
+      const file = files[0];
+      const src = await PDFDocument.load(await file.arrayBuffer());
+      const n = src.getPageCount();
+      const base = baseName(file.name);
+      const width = String(n).length;
+      if (n === 1) {
+        setStatus(status, 'PDF-il on ainult 1 leht — pole midagi tükeldada.', 'error');
+        goBtn.disabled = false;
+        return;
+      }
+      const outputs = [];
+      for (let i = 0; i < n; i++) {
+        setStatus(status, `Eraldan lehe ${i + 1}/${n}…`, 'working');
+        const one = await PDFDocument.create();
+        const [pg] = await one.copyPages(src, [i]);
+        one.addPage(pg);
+        outputs.push({ name: `${base}-leht-${pad(i + 1, width)}.pdf`, bytes: await one.save() });
+      }
+      setStatus(status, 'Pakin ZIP-i…', 'working');
+      const zip = new JSZip();
+      outputs.forEach(o => zip.file(o.name, o.bytes));
+      downloadBlob(await zip.generateAsync({ type: 'blob' }), `${base}-lehed.zip`);
+      setStatus(status, `✓ Valmis — ${n} lehte ZIP-failis.`, 'done');
+    } catch (err) {
+      console.error(err);
+      setStatus(status, '✗ Viga: ' + (err.message || err), 'error');
+    } finally {
+      goBtn.disabled = ctrl.get().length === 0;
+    }
+  });
+}
+
+/* ───────────── Auth + init ───────────── */
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = '../'; return; }
+  currentUser = session.user;
+
+  const { data: adminRow } = await sb.from('admins').select('user_id, display_name').eq('user_id', currentUser.id).maybeSingle();
+  if (!adminRow) {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('denied-screen').style.display = 'flex';
+    return;
+  }
+
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) logoutBtn.addEventListener('click', () => sb.auth.signOut());
+
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  if (window.SkoorTimerBanner) {
+    await SkoorTimerBanner.init({ sb, currentUser, getClientName: (id) => id });
+  }
+
+  initImageTool();
+  initMergeTool();
+  initSplitTool();
+
+  sb.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT') window.location.href = '../';
+  });
+}
+
+init();
+</script>
+</body>
+</html>
