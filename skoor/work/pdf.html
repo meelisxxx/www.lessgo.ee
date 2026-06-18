@@ -156,16 +156,26 @@
       padding: 8px 10px;
       font-size: 13.5px;
     }
+    .file-item .fi-thumb {
+      width: 42px; height: 42px; flex: none;
+      border-radius: 5px; object-fit: cover;
+      background: var(--bg); border: 1px solid var(--border);
+    }
+    .file-item .fi-thumb.placeholder {
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text3); font-size: 16px;
+    }
     .file-item .fi-idx { color: var(--text3); font-variant-numeric: tabular-nums; min-width: 20px; text-align: right; }
     .file-item .fi-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .file-item .fi-size { color: var(--text3); font-size: 12px; font-variant-numeric: tabular-nums; }
     .file-item .fi-btn {
       background: transparent; color: var(--text3);
-      padding: 2px 6px; font-size: 14px; border-radius: 5px; line-height: 1;
+      padding: 3px 7px; font-size: 14px; border-radius: 5px; line-height: 1;
     }
     .file-item .fi-btn:hover:not(:disabled) { background: var(--hover-strong); color: var(--text); }
     .file-item .fi-btn:disabled { opacity: 0.25; cursor: default; }
     .file-item .fi-btn.del:hover { color: var(--neg); }
+    .file-item .fi-btn.rot:hover { color: var(--accent); }
 
     /* Segmented toggle */
     .segmented { display: inline-flex; background: var(--bg3); border-radius: 8px; padding: 3px; gap: 3px; margin: 16px 0 0; }
@@ -222,7 +232,7 @@
     <!-- ───────────── 1. Pildid → PDF-id ───────────── -->
     <div class="card" id="tool-img">
       <h2>Pildid → PDF</h2>
-      <p class="subtitle">Lohista pildid (JPG, PNG, HEIC…). Vali, kas iga pilt saab oma PDF-i või lähevad kõik ühte PDF-i.</p>
+      <p class="subtitle">Lohista pildid (JPG, PNG, HEIC…). Pildid pööratakse automaatselt õigetpidi; vajadusel keera ↻ nupuga. Vali, kas iga pilt saab oma PDF-i või lähevad kõik ühte.</p>
 
       <label class="dropzone" data-dz="img">
         <span class="dz-icon">🖼️</span>
@@ -333,33 +343,49 @@ function isHeic(file) {
   return HEIC_RE.test(file.name) || file.type === 'image/heic' || file.type === 'image/heif';
 }
 
-/* Loe pildi (mis tahes vorming) pdf-lib jaoks: tagastab {bytes, kind:'jpg'|'png'} */
-async function imageToBytes(file) {
+/* Dekodeeri pilt EXIF-orientatsiooniga (õigetpidi). HEIC → JPEG eelnevalt.
+   Tagastab ImageBitmap, mille pikslid on juba õiges suunas. */
+async function decodeOriented(file) {
   let blob = file;
-  // HEIC → JPEG
   if (isHeic(file)) {
-    const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+    const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.95 });
     blob = Array.isArray(out) ? out[0] : out;
   }
-  const type = blob.type || '';
-  if (type === 'image/jpeg' || /\.jpe?g$/i.test(file.name)) {
-    return { bytes: new Uint8Array(await blob.arrayBuffer()), kind: 'jpg' };
+  try {
+    return await createImageBitmap(blob, { imageOrientation: 'from-image' });
+  } catch (e) {
+    return await createImageBitmap(blob); // varuvariant vanematele brauseritele
   }
-  if (type === 'image/png' || /\.png$/i.test(file.name)) {
-    return { bytes: new Uint8Array(await blob.arrayBuffer()), kind: 'png' };
-  }
-  // Muu (webp, gif, bmp…) → canvas → PNG
-  const bitmap = await createImageBitmap(blob);
+}
+
+const MAXDIM = 2200; // pikima külje ülempiir — hoiab PDF-i meilisõbralikuna
+/* Joonista (juba õigetpidi) bitmap canvasele, rakendades käsitsi-pöörde ja skaleeringu */
+function bitmapToCanvas(bmp, rotate, maxDim) {
+  const r = ((rotate % 360) + 360) % 360;
+  const swap = (r === 90 || r === 270);
+  let w = swap ? bmp.height : bmp.width;
+  let h = swap ? bmp.width : bmp.height;
+  const cap = maxDim || MAXDIM;
+  const scale = Math.min(1, cap / Math.max(w, h));
+  w = Math.max(1, Math.round(w * scale));
+  h = Math.max(1, Math.round(h * scale));
   const canvas = document.createElement('canvas');
-  canvas.width = bitmap.width; canvas.height = bitmap.height;
-  canvas.getContext('2d').drawImage(bitmap, 0, 0);
-  const pngBlob = await new Promise(res => canvas.toBlob(res, 'image/png'));
-  return { bytes: new Uint8Array(await pngBlob.arrayBuffer()), kind: 'png' };
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate(r * Math.PI / 180);
+  ctx.scale(scale, scale);
+  ctx.drawImage(bmp, -bmp.width / 2, -bmp.height / 2);
+  return canvas;
+}
+function canvasToJpegBytes(canvas) {
+  return new Promise(res => canvas.toBlob(
+    async b => res(new Uint8Array(await b.arrayBuffer())), 'image/jpeg', 0.92));
 }
 
 const A4 = { w: 595.28, h: 841.89 };
 const MARGIN = 18;
-/* Joonista pilt A4-lehele (auto-orientatsioon, tsentreeritud) */
+/* Joonista pilt A4-lehele (auto-orientatsioon lehe järgi, tsentreeritud) */
 function drawImageOnPage(pdfDoc, img) {
   const landscape = img.width > img.height;
   const pageW = landscape ? A4.h : A4.w;
@@ -370,48 +396,84 @@ function drawImageOnPage(pdfDoc, img) {
   const w = img.width * scale, h = img.height * scale;
   page.drawImage(img, { x: (pageW - w) / 2, y: (pageH - h) / 2, width: w, height: h });
 }
-async function embedImage(pdfDoc, file) {
-  const { bytes, kind } = await imageToBytes(file);
-  return kind === 'jpg' ? await pdfDoc.embedJpg(bytes) : await pdfDoc.embedPng(bytes);
+/* Lisa ühe pildi-itemi leht PDF-i (dekodeerib vajadusel, rakendab pöörde) */
+async function addImagePage(pdf, item) {
+  if (!item._bmp) item._bmp = await decodeOriented(item.file);
+  const bytes = await canvasToJpegBytes(bitmapToCanvas(item._bmp, item.rotate, MAXDIM));
+  drawImageOnPage(pdf, await pdf.embedJpg(bytes));
 }
 
-/* ───────────── Korduvkasutatav failinimekirja-kontroller ───────────── */
+/* ───────────── Korduvkasutatav failinimekirja-kontroller ─────────────
+   Items hoitakse objektidena { file, rotate, _bmp, _thumb }. */
 function makeFileController(opts) {
-  // opts: { dzKey, listEl, onChange, multiple, reorder }
+  // opts: { dzKey, listEl, onChange, multiple, reorder, thumbs, rotate }
   const dz = document.querySelector(`[data-dz="${opts.dzKey}"]`);
   const input = dz.querySelector('input[type="file"]');
   const listEl = document.getElementById(opts.listEl);
-  let files = [];
+  let items = [];
+  let decoding = false;
 
   function render() {
     listEl.innerHTML = '';
-    files.forEach((f, i) => {
+    items.forEach((it, i) => {
       const li = document.createElement('li');
       li.className = 'file-item';
-      let controls = '';
-      if (opts.reorder) {
-        controls += `<button class="fi-btn up" data-i="${i}" ${i === 0 ? 'disabled' : ''} title="Üles">▲</button>`;
-        controls += `<button class="fi-btn down" data-i="${i}" ${i === files.length - 1 ? 'disabled' : ''} title="Alla">▼</button>`;
+
+      let html = '';
+      if (opts.thumbs) {
+        html += it._thumb
+          ? `<img class="fi-thumb" src="${it._thumb}" alt="">`
+          : `<span class="fi-thumb placeholder">⏳</span>`;
       }
-      controls += `<button class="fi-btn del" data-i="${i}" title="Eemalda">✕</button>`;
-      li.innerHTML =
-        `<span class="fi-idx">${i + 1}.</span>` +
-        `<span class="fi-name" title="${f.name}">${f.name}</span>` +
-        `<span class="fi-size">${fmtSize(f.size)}</span>` + controls;
+      html += `<span class="fi-idx">${i + 1}.</span>`;
+      html += `<span class="fi-name" title="${it.file.name}">${it.file.name}</span>`;
+      html += `<span class="fi-size">${fmtSize(it.file.size)}</span>`;
+      if (opts.rotate) html += `<button class="fi-btn rot" data-i="${i}" title="Keera 90°">↻</button>`;
+      if (opts.reorder) {
+        html += `<button class="fi-btn up" data-i="${i}" ${i === 0 ? 'disabled' : ''} title="Üles">▲</button>`;
+        html += `<button class="fi-btn down" data-i="${i}" ${i === items.length - 1 ? 'disabled' : ''} title="Alla">▼</button>`;
+      }
+      html += `<button class="fi-btn del" data-i="${i}" title="Eemalda">✕</button>`;
+      li.innerHTML = html;
       listEl.appendChild(li);
     });
-    opts.onChange(files);
+    opts.onChange(items);
+  }
+
+  // Dekodeeri pisipildid taustal, järjest (väldib HEIC-i puhul tarduvust)
+  async function processThumbs() {
+    if (decoding) return;
+    decoding = true;
+    try {
+      for (const it of items) {
+        if (it._thumb || it._failed) continue;
+        try {
+          if (!it._bmp) it._bmp = await decodeOriented(it.file);
+          it._thumb = bitmapToCanvas(it._bmp, it.rotate, 84).toDataURL('image/jpeg', 0.7);
+        } catch (e) {
+          it._failed = true; it._thumb = null;
+        }
+        render();
+      }
+    } finally { decoding = false; }
+  }
+
+  function refreshThumb(it) {
+    if (it._bmp) {
+      try { it._thumb = bitmapToCanvas(it._bmp, it.rotate, 84).toDataURL('image/jpeg', 0.7); }
+      catch (e) { /* jätame vana */ }
+    }
   }
 
   function add(newFiles) {
-    const arr = Array.from(newFiles);
+    const arr = Array.from(newFiles).map(f => ({ file: f, rotate: 0, _bmp: null, _thumb: null }));
     if (!arr.length) return;
-    files = opts.multiple ? files.concat(arr) : [arr[0]];
+    items = opts.multiple ? items.concat(arr) : [arr[0]];
     render();
+    if (opts.thumbs) processThumbs();
   }
-  function clear() { files = []; render(); }
+  function clear() { items = []; render(); }
 
-  // klõps + drag-drop
   dz.addEventListener('click', (e) => { if (e.target !== input) input.click(); });
   input.addEventListener('change', () => { add(input.files); input.value = ''; });
   dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('dragover'); });
@@ -425,13 +487,14 @@ function makeFileController(opts) {
     const btn = e.target.closest('.fi-btn');
     if (!btn) return;
     const i = +btn.dataset.i;
-    if (btn.classList.contains('del')) files.splice(i, 1);
-    else if (btn.classList.contains('up')) [files[i - 1], files[i]] = [files[i], files[i - 1]];
-    else if (btn.classList.contains('down')) [files[i + 1], files[i]] = [files[i], files[i + 1]];
+    if (btn.classList.contains('del')) items.splice(i, 1);
+    else if (btn.classList.contains('up')) [items[i - 1], items[i]] = [items[i], items[i - 1]];
+    else if (btn.classList.contains('down')) [items[i + 1], items[i]] = [items[i], items[i + 1]];
+    else if (btn.classList.contains('rot')) { items[i].rotate = (items[i].rotate + 90) % 360; refreshThumb(items[i]); }
     render();
   });
 
-  return { get: () => files, clear };
+  return { get: () => items, clear };
 }
 
 /* ───────────── 1. Pildid → PDF-id ───────────── */
@@ -444,11 +507,10 @@ function initImageTool() {
   let mode = 'separate';
 
   const ctrl = makeFileController({
-    dzKey: 'img', listEl: 'img-list', multiple: true, reorder: true,
-    onChange: (files) => {
-      goBtn.disabled = files.length === 0;
-      clearBtn.style.display = files.length ? '' : 'none';
-      setStatus(status, '');
+    dzKey: 'img', listEl: 'img-list', multiple: true, reorder: true, thumbs: true, rotate: true,
+    onChange: (items) => {
+      goBtn.disabled = items.length === 0;
+      clearBtn.style.display = items.length ? '' : 'none';
     }
   });
 
@@ -459,33 +521,32 @@ function initImageTool() {
     combinedNameRow.style.display = mode === 'combined' ? '' : 'none';
   });
 
-  clearBtn.addEventListener('click', () => ctrl.clear());
+  clearBtn.addEventListener('click', () => { ctrl.clear(); setStatus(status, ''); });
 
   goBtn.addEventListener('click', async () => {
-    const files = ctrl.get();
-    if (!files.length) return;
+    const items = ctrl.get();
+    if (!items.length) return;
     goBtn.disabled = true;
     const { PDFDocument } = PDFLib;
     try {
       if (mode === 'combined') {
         const pdf = await PDFDocument.create();
-        for (let i = 0; i < files.length; i++) {
-          setStatus(status, `Töötlen pilti ${i + 1}/${files.length}…`, 'working');
-          drawImageOnPage(pdf, await embedImage(pdf, files[i]));
+        for (let i = 0; i < items.length; i++) {
+          setStatus(status, `Töötlen pilti ${i + 1}/${items.length}…`, 'working');
+          await addImagePage(pdf, items[i]);
         }
         const bytes = await pdf.save();
         let name = (document.getElementById('img-out-name').value || 'pildid.pdf').trim();
         if (!/\.pdf$/i.test(name)) name += '.pdf';
         downloadBlob(new Blob([bytes], { type: 'application/pdf' }), name);
-        setStatus(status, `✓ Valmis — ${files.length} pilti ühes PDF-is.`, 'done');
+        setStatus(status, `✓ Valmis — ${items.length} pilti ühes PDF-is.`, 'done');
       } else {
-        // eraldi PDF iga pildi kohta
         const outputs = [];
-        for (let i = 0; i < files.length; i++) {
-          setStatus(status, `Töötlen pilti ${i + 1}/${files.length}…`, 'working');
+        for (let i = 0; i < items.length; i++) {
+          setStatus(status, `Töötlen pilti ${i + 1}/${items.length}…`, 'working');
           const pdf = await PDFDocument.create();
-          drawImageOnPage(pdf, await embedImage(pdf, files[i]));
-          outputs.push({ name: baseName(files[i].name) + '.pdf', bytes: await pdf.save() });
+          await addImagePage(pdf, items[i]);
+          outputs.push({ name: baseName(items[i].file.name) + '.pdf', bytes: await pdf.save() });
         }
         if (outputs.length === 1) {
           downloadBlob(new Blob([outputs[0].bytes], { type: 'application/pdf' }), outputs[0].name);
@@ -515,25 +576,24 @@ function initMergeTool() {
 
   const ctrl = makeFileController({
     dzKey: 'merge', listEl: 'merge-list', multiple: true, reorder: true,
-    onChange: (files) => {
-      goBtn.disabled = files.length < 1;
-      clearBtn.style.display = files.length ? '' : 'none';
-      setStatus(status, '');
+    onChange: (items) => {
+      goBtn.disabled = items.length < 1;
+      clearBtn.style.display = items.length ? '' : 'none';
     }
   });
 
-  clearBtn.addEventListener('click', () => ctrl.clear());
+  clearBtn.addEventListener('click', () => { ctrl.clear(); setStatus(status, ''); });
 
   goBtn.addEventListener('click', async () => {
-    const files = ctrl.get();
-    if (files.length < 1) return;
+    const items = ctrl.get();
+    if (items.length < 1) return;
     goBtn.disabled = true;
     const { PDFDocument } = PDFLib;
     try {
       const merged = await PDFDocument.create();
-      for (let i = 0; i < files.length; i++) {
-        setStatus(status, `Liidan ${i + 1}/${files.length}…`, 'working');
-        const src = await PDFDocument.load(await files[i].arrayBuffer());
+      for (let i = 0; i < items.length; i++) {
+        setStatus(status, `Liidan ${i + 1}/${items.length}…`, 'working');
+        const src = await PDFDocument.load(await items[i].file.arrayBuffer());
         const pages = await merged.copyPages(src, src.getPageIndices());
         pages.forEach(p => merged.addPage(p));
       }
@@ -541,7 +601,7 @@ function initMergeTool() {
       let name = (document.getElementById('merge-out-name').value || 'liidetud.pdf').trim();
       if (!/\.pdf$/i.test(name)) name += '.pdf';
       downloadBlob(new Blob([bytes], { type: 'application/pdf' }), name);
-      setStatus(status, `✓ Valmis — ${files.length} faili liidetud (${merged.getPageCount()} lehte).`, 'done');
+      setStatus(status, `✓ Valmis — ${items.length} faili liidetud (${merged.getPageCount()} lehte).`, 'done');
     } catch (err) {
       console.error(err);
       setStatus(status, '✗ Viga: ' + (err.message || err), 'error');
@@ -559,22 +619,21 @@ function initSplitTool() {
 
   const ctrl = makeFileController({
     dzKey: 'split', listEl: 'split-list', multiple: false, reorder: false,
-    onChange: (files) => {
-      goBtn.disabled = files.length === 0;
-      clearBtn.style.display = files.length ? '' : 'none';
-      setStatus(status, '');
+    onChange: (items) => {
+      goBtn.disabled = items.length === 0;
+      clearBtn.style.display = items.length ? '' : 'none';
     }
   });
 
-  clearBtn.addEventListener('click', () => ctrl.clear());
+  clearBtn.addEventListener('click', () => { ctrl.clear(); setStatus(status, ''); });
 
   goBtn.addEventListener('click', async () => {
-    const files = ctrl.get();
-    if (!files.length) return;
+    const items = ctrl.get();
+    if (!items.length) return;
     goBtn.disabled = true;
     const { PDFDocument } = PDFLib;
     try {
-      const file = files[0];
+      const file = items[0].file;
       const src = await PDFDocument.load(await file.arrayBuffer());
       const n = src.getPageCount();
       const base = baseName(file.name);
