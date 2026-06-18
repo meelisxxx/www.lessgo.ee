@@ -13,10 +13,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-  <!-- PDF-tööriistad — vendor'itud, kõik brauseris, midagi ei lahku arvutist -->
+  <!-- PDF-tööriistad — vendor'itud, kõik brauseris, midagi ei lahku arvutist.
+       HEIC: heic-to/csp (asm.js, eval-vaba) laetakse vajaduspõhiselt dünaamilise import'iga. -->
   <script src="vendor/pdf-lib/pdf-lib.min.js" defer></script>
   <script src="vendor/jszip/jszip.min.js" defer></script>
-  <script src="vendor/heic2any/heic2any.min.js" defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -356,22 +356,29 @@ async function bitmapFrom(blob) {
   catch (e) { return await createImageBitmap(blob); } // varuvariant vanematele brauseritele
 }
 
+/* heic-to/csp laetakse vajaduspõhiselt (3MB, ainult kui HEIC-i töödeldakse) */
+let _heicToPromise = null;
+function loadHeicTo() {
+  if (!_heicToPromise) _heicToPromise = import('./vendor/heic-to/heic-to.js');
+  return _heicToPromise;
+}
+
 /* Dekodeeri pilt EXIF-orientatsiooniga (õigetpidi). Tagastab ImageBitmap.
    1) Natiivne dekodeerimine (Safari oskab HEIC-i; kõik brauserid JPG/PNG).
-   2) HEIC Chrome'is → heic2any (blob-Worker; vajab CSP worker-src blob:). */
+   2) HEIC Chrome'is → heic-to/csp (asm.js, eval-vaba; vajab worker-src blob:). */
 async function decodeOriented(file) {
   try {
     return await createImageBitmap(file, { imageOrientation: 'from-image' });
-  } catch (_) { /* HEIC Chrome'is / vorming kukub läbi → proovi heic2any */ }
+  } catch (_) { /* HEIC Chrome'is / vorming kukub läbi → proovi heic-to */ }
 
   if (isHeic(file)) {
-    if (typeof heic2any !== 'function') throw new Error('HEIC-tugi pole laetud');
-    const out = await withTimeout(
-      heic2any({ blob: file, toType: 'image/jpeg', quality: 0.95 }),
-      30000,
-      'HEIC-i teisendamine aegus — tõenäoliselt blokeerib CSP blob-Workeri. Ava Safaris või luba worker-src blob:.'
+    const { heicTo } = await loadHeicTo();
+    const jpeg = await withTimeout(
+      heicTo({ blob: file, type: 'image/jpeg', quality: 0.92 }),
+      60000,
+      'HEIC-i teisendamine aegus. Proovi uuesti või ava Safaris.'
     );
-    return await bitmapFrom(Array.isArray(out) ? out[0] : out);
+    return await bitmapFrom(jpeg);
   }
   // Muu vorming (peaks 1. sammus õnnestuma) — viimane katse
   return await createImageBitmap(file);
