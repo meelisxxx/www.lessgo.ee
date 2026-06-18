@@ -358,7 +358,7 @@ async function decodeOriented(file) {
   }
 }
 
-const MAXDIM = 2200; // pikima külje ülempiir — hoiab PDF-i meilisõbralikuna
+const MAXDIM = 3500; // pikima külje ülempiir — teravus + mõõdukas failisuurus
 /* Joonista (juba õigetpidi) bitmap canvasele, rakendades käsitsi-pöörde ja skaleeringu */
 function bitmapToCanvas(bmp, rotate, maxDim) {
   const r = ((rotate % 360) + 360) % 360;
