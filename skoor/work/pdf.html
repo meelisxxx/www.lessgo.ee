@@ -343,19 +343,46 @@ function isHeic(file) {
   return HEIC_RE.test(file.name) || file.type === 'image/heic' || file.type === 'image/heif';
 }
 
-/* Dekodeeri pilt EXIF-orientatsiooniga (õigetpidi). HEIC → JPEG eelnevalt.
-   Tagastab ImageBitmap, mille pikslid on juba õiges suunas. */
+/* Lubadus, mis kukub timeout'iga läbi — väldib vaikset igavest rippumist */
+function withTimeout(promise, ms, msg) {
+  return Promise.race([
+    promise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error(msg)), ms))
+  ]);
+}
+
+async function bitmapFrom(blob) {
+  try { return await createImageBitmap(blob, { imageOrientation: 'from-image' }); }
+  catch (e) { return await createImageBitmap(blob); } // varuvariant vanematele brauseritele
+}
+
+/* Dekodeeri pilt EXIF-orientatsiooniga (õigetpidi). Tagastab ImageBitmap.
+   1) Natiivne dekodeerimine (Safari oskab HEIC-i; kõik brauserid JPG/PNG).
+   2) HEIC Chrome'is → heic2any (blob-Worker; vajab CSP worker-src blob:). */
 async function decodeOriented(file) {
-  let blob = file;
-  if (isHeic(file)) {
-    const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.95 });
-    blob = Array.isArray(out) ? out[0] : out;
-  }
   try {
-    return await createImageBitmap(blob, { imageOrientation: 'from-image' });
-  } catch (e) {
-    return await createImageBitmap(blob); // varuvariant vanematele brauseritele
+    return await createImageBitmap(file, { imageOrientation: 'from-image' });
+  } catch (_) { /* HEIC Chrome'is / vorming kukub läbi → proovi heic2any */ }
+
+  if (isHeic(file)) {
+    if (typeof heic2any !== 'function') throw new Error('HEIC-tugi pole laetud');
+    const out = await withTimeout(
+      heic2any({ blob: file, toType: 'image/jpeg', quality: 0.95 }),
+      30000,
+      'HEIC-i teisendamine aegus — tõenäoliselt blokeerib CSP blob-Workeri. Ava Safaris või luba worker-src blob:.'
+    );
+    return await bitmapFrom(Array.isArray(out) ? out[0] : out);
   }
+  // Muu vorming (peaks 1. sammus õnnestuma) — viimane katse
+  return await createImageBitmap(file);
+}
+
+/* Üks dekodeerimine itemi kohta — pisipilt ja PDF jagavad sama lubadust */
+function ensureBitmap(it) {
+  if (!it._bmpPromise) {
+    it._bmpPromise = decodeOriented(it.file).then(b => { it._bmp = b; return b; });
+  }
+  return it._bmpPromise;
 }
 
 const MAXDIM = 3500; // pikima külje ülempiir — teravus + mõõdukas failisuurus
@@ -379,8 +406,10 @@ function bitmapToCanvas(bmp, rotate, maxDim) {
   return canvas;
 }
 function canvasToJpegBytes(canvas) {
-  return new Promise(res => canvas.toBlob(
-    async b => res(new Uint8Array(await b.arrayBuffer())), 'image/jpeg', 0.92));
+  return new Promise((res, rej) => canvas.toBlob(b => {
+    if (!b) { rej(new Error('Pildi kodeerimine ebaõnnestus (canvas tühi)')); return; }
+    b.arrayBuffer().then(ab => res(new Uint8Array(ab)), rej);
+  }, 'image/jpeg', 0.92));
 }
 
 const A4 = { w: 595.28, h: 841.89 };
@@ -398,8 +427,8 @@ function drawImageOnPage(pdfDoc, img) {
 }
 /* Lisa ühe pildi-itemi leht PDF-i (dekodeerib vajadusel, rakendab pöörde) */
 async function addImagePage(pdf, item) {
-  if (!item._bmp) item._bmp = await decodeOriented(item.file);
-  const bytes = await canvasToJpegBytes(bitmapToCanvas(item._bmp, item.rotate, MAXDIM));
+  const bmp = await ensureBitmap(item);
+  const bytes = await canvasToJpegBytes(bitmapToCanvas(bmp, item.rotate, MAXDIM));
   drawImageOnPage(pdf, await pdf.embedJpg(bytes));
 }
 
@@ -421,9 +450,9 @@ function makeFileController(opts) {
 
       let html = '';
       if (opts.thumbs) {
-        html += it._thumb
-          ? `<img class="fi-thumb" src="${it._thumb}" alt="">`
-          : `<span class="fi-thumb placeholder">⏳</span>`;
+        if (it._thumb) html += `<img class="fi-thumb" src="${it._thumb}" alt="">`;
+        else if (it._failed) html += `<span class="fi-thumb placeholder" title="${(it._error || 'Viga').replace(/"/g, '')}" style="color:var(--neg)">✗</span>`;
+        else html += `<span class="fi-thumb placeholder">⏳</span>`;
       }
       html += `<span class="fi-idx">${i + 1}.</span>`;
       html += `<span class="fi-name" title="${it.file.name}">${it.file.name}</span>`;
@@ -448,10 +477,11 @@ function makeFileController(opts) {
       for (const it of items) {
         if (it._thumb || it._failed) continue;
         try {
-          if (!it._bmp) it._bmp = await decodeOriented(it.file);
-          it._thumb = bitmapToCanvas(it._bmp, it.rotate, 84).toDataURL('image/jpeg', 0.7);
+          const bmp = await ensureBitmap(it);
+          it._thumb = bitmapToCanvas(bmp, it.rotate, 84).toDataURL('image/jpeg', 0.7);
         } catch (e) {
           it._failed = true; it._thumb = null;
+          it._error = (e && e.message) || 'Pildi dekodeerimine ebaõnnestus';
         }
         render();
       }
