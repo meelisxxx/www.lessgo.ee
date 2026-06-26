@@ -21,6 +21,7 @@
     { file: 'tasks.html',      label: 'Ülesanded' },
     { file: 'reports.html',    label: 'Arved' },
     { file: 'clients.html',    label: 'Kliendid' },
+    { file: 'crm.html',        label: 'CRM' },
     { file: 'templates.html',  label: 'Mallid' },
     { file: 'diginaator.html', label: 'DiginaatoR' },
     { file: 'pdf.html',        label: 'PDF' },

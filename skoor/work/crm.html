@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Skoor WORK — CRM</title>
+  <script>(function(){try{const t=localStorage.getItem('skoor-theme')||'system';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="timer-banner.css">
+  <script src="timer-banner.js" defer></script>
+  <link rel="icon" type="image/svg+xml" href="../skoor-favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:#111827; --bg2:#1f2937; --bg3:#374151;
+      --border:rgba(255,255,255,0.08);
+      --text:#f9fafb; --text2:#9ca3af; --text3:#6b7280;
+      --accent:#10b981; --pos:#10b981; --neg:#ef4444; --warn:#f59e0b; --info:#818cf8;
+      --radius:12px;
+    }
+    body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+    a { color:var(--accent); text-decoration:none; }
+    a:hover { opacity:0.8; }
+
+    #loading-screen, #denied-screen {
+      display:none; flex-direction:column; align-items:center; justify-content:center;
+      min-height:100vh; padding:24px; text-align:center;
+    }
+    #denied-screen h2 { color:var(--neg); margin-bottom:12px; }
+    #denied-screen p { color:var(--text2); margin-bottom:24px; }
+    .nav-link { padding:6px 12px; border:1px solid var(--border); border-radius:6px; color:var(--text2); font-size:13px; }
+
+    #app { display:none; flex-direction:column; min-height:100vh; }
+    main { padding:24px; max-width:1280px; margin:0 auto; width:100%; }
+
+    button { cursor:pointer; font-family:inherit; border:none; border-radius:8px; transition:opacity .2s, background .2s, transform .1s; }
+    button:disabled { opacity:0.5; cursor:not-allowed; }
+    button:active:not(:disabled) { transform:scale(0.97); }
+
+    input, select, textarea {
+      background:var(--bg3); border:1px solid var(--border); border-radius:6px;
+      color:var(--text); font-family:inherit; font-size:13px; padding:7px 9px; outline:none;
+      transition:border-color .2s; width:100%;
+    }
+    input:focus, select:focus, textarea:focus { border-color:var(--accent); }
+    textarea { resize:vertical; min-height:38px; }
+    label { font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; }
+
+    .page-intro { color:var(--text2); font-size:14px; margin-bottom:18px; max-width:820px; }
+
+    .btn-primary { background:var(--accent); color:#fff; padding:8px 14px; font-size:13px; font-weight:600; }
+    .btn-primary:hover:not(:disabled) { opacity:0.9; }
+    .btn-secondary { background:var(--bg3); color:var(--text); padding:7px 12px; font-size:12px; }
+    .btn-secondary:hover:not(:disabled) { background:#4b5563; }
+    .btn-ghost { background:transparent; color:var(--text3); border:1px solid var(--border); padding:5px 9px; font-size:12px; }
+    .btn-ghost:hover:not(:disabled) { color:var(--text); border-color:var(--text2); }
+    .btn-danger { background:transparent; color:var(--text3); border:1px solid var(--border); padding:4px 8px; font-size:12px; }
+    .btn-danger:hover:not(:disabled) { color:var(--neg); border-color:var(--neg); }
+
+    /* ── Eelseisvad meeldetuletused (top panel) ── */
+    .upcoming {
+      background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius);
+      padding:16px 18px; margin-bottom:22px;
+    }
+    .upcoming-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+    .upcoming-title { font-size:14px; font-weight:700; letter-spacing:0.3px; }
+    .upcoming-count { font-size:12px; color:var(--text2); margin-left:auto; }
+    .reminder-line {
+      display:flex; align-items:center; gap:12px; padding:9px 10px; border-radius:8px;
+      background:var(--bg3); margin-bottom:7px;
+    }
+    .reminder-line:last-child { margin-bottom:0; }
+    .reminder-line .rl-due {
+      font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.4px;
+      padding:3px 8px; border-radius:5px; white-space:nowrap; flex-shrink:0; min-width:96px; text-align:center;
+    }
+    .rl-due.overdue { background:rgba(239,68,68,0.15); color:var(--neg); }
+    .rl-due.today   { background:rgba(245,158,11,0.18); color:var(--warn); }
+    .rl-due.soon    { background:rgba(129,140,248,0.15); color:var(--info); }
+    .reminder-line .rl-body { flex:1; min-width:0; }
+    .reminder-line .rl-title { font-size:13px; font-weight:500; }
+    .reminder-line .rl-meta { font-size:11px; color:var(--text2); }
+    .reminder-line .rl-client {
+      color:var(--accent); cursor:pointer; font-weight:600;
+    }
+    .reminder-line .rl-client:hover { text-decoration:underline; }
+    .reminder-line .rl-done { flex-shrink:0; }
+    .upcoming-empty { color:var(--text3); font-size:13px; padding:6px 2px; }
+
+    /* ── Master-detail layout ── */
+    .crm-layout { display:grid; grid-template-columns:300px 1fr; gap:22px; align-items:start; }
+
+    .client-list-panel {
+      background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius);
+      padding:14px; position:sticky; top:14px;
+    }
+    .client-list-panel input[type="search"] { margin-bottom:10px; }
+    .client-list { display:flex; flex-direction:column; gap:2px; max-height:70vh; overflow-y:auto; }
+    .client-list-item {
+      text-align:left; background:transparent; color:var(--text2);
+      padding:8px 10px; border-radius:7px; font-size:13px; font-weight:500;
+      border:1px solid transparent; display:flex; align-items:center; gap:8px;
+    }
+    .client-list-item:hover { background:var(--bg3); color:var(--text); }
+    .client-list-item.active { background:rgba(16,185,129,0.10); border-color:rgba(16,185,129,0.30); color:var(--text); }
+    .client-list-item .cli-badge {
+      margin-left:auto; font-size:10px; font-weight:700; min-width:18px; height:18px;
+      display:inline-flex; align-items:center; justify-content:center; border-radius:9px;
+      background:var(--neg); color:#fff; padding:0 5px;
+    }
+    .client-list-count { font-size:12px; color:var(--text3); margin-top:8px; text-align:center; }
+
+    .detail-panel { min-width:0; }
+    .detail-empty {
+      background:var(--bg2); border:1px dashed var(--border); border-radius:var(--radius);
+      padding:48px 24px; text-align:center; color:var(--text3); font-size:14px;
+    }
+    .detail-head {
+      display:flex; align-items:baseline; gap:12px; margin-bottom:18px; flex-wrap:wrap;
+    }
+    .detail-name { font-size:22px; font-weight:700; letter-spacing:-0.02em; }
+
+    .crm-section {
+      background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius);
+      padding:16px 18px; margin-bottom:18px;
+    }
+    .crm-section-head { display:flex; align-items:center; gap:9px; margin-bottom:14px; }
+    .crm-section-title { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--text2); }
+    .crm-section-count { font-size:12px; color:var(--text3); margin-left:auto; }
+
+    /* contacts */
+    .contact-card { background:var(--bg3); border-radius:8px; padding:12px; margin-bottom:10px; }
+    .contact-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .contact-field-label { font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:3px; }
+    .contact-foot { display:flex; align-items:center; gap:10px; margin-top:10px; }
+    .primary-toggle { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text2); cursor:pointer; }
+    .primary-toggle input { width:auto; }
+    .contact-foot .save-status { font-size:11px; color:var(--text3); margin-left:auto; }
+
+    /* interactions / timeline */
+    .interaction-add { display:grid; grid-template-columns:140px 150px 1fr auto; gap:8px; align-items:end; margin-bottom:14px; }
+    .timeline { display:flex; flex-direction:column; gap:0; }
+    .timeline-item { display:flex; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); }
+    .timeline-item:last-child { border-bottom:none; }
+    .ti-icon { font-size:16px; flex-shrink:0; width:26px; text-align:center; }
+    .ti-body { flex:1; min-width:0; }
+    .ti-summary { font-size:13px; white-space:pre-wrap; word-break:break-word; }
+    .ti-meta { font-size:11px; color:var(--text3); margin-top:3px; }
+    .ti-del { flex-shrink:0; }
+
+    /* reminders */
+    .reminder-add { display:grid; grid-template-columns:1fr 150px 160px auto; gap:8px; align-items:end; margin-bottom:6px; }
+    .reminder-add-details { margin-bottom:14px; }
+    .rem-item { display:flex; align-items:flex-start; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); }
+    .rem-item:last-child { border-bottom:none; }
+    .rem-check {
+      width:20px; height:20px; border:1.5px solid var(--text3); border-radius:5px; flex-shrink:0;
+      background:transparent; color:#fff; font-size:13px; display:inline-flex; align-items:center; justify-content:center; margin-top:1px;
+    }
+    .rem-check:hover { border-color:var(--accent); }
+    .rem-check.done { background:var(--accent); border-color:var(--accent); }
+    .rem-body { flex:1; min-width:0; }
+    .rem-title { font-size:13px; font-weight:500; }
+    .rem-item.is-done .rem-title { text-decoration:line-through; color:var(--text3); }
+    .rem-details { font-size:12px; color:var(--text2); white-space:pre-wrap; margin-top:2px; }
+    .rem-meta { font-size:11px; margin-top:3px; }
+    .rem-due { font-weight:700; }
+    .rem-due.overdue { color:var(--neg); }
+    .rem-due.today { color:var(--warn); }
+    .rem-due.soon { color:var(--info); }
+    .rem-due.future { color:var(--text2); }
+
+    .empty-msg { color:var(--text3); font-size:13px; padding:8px 0; }
+
+    /* toast */
+    .toast {
+      position:fixed; bottom:24px; right:24px; background:var(--bg2);
+      border:1px solid var(--border); border-radius:8px; padding:10px 16px; font-size:13px;
+      box-shadow:0 6px 20px rgba(0,0,0,0.4); z-index:1000; transform:translateY(100px); opacity:0;
+      transition:transform .25s, opacity .25s;
+    }
+    .toast.visible { transform:translateY(0); opacity:1; }
+    .toast.success { border-color:rgba(16,185,129,0.4); }
+    .toast.error { border-color:rgba(239,68,68,0.4); color:var(--neg); }
+
+    @media (max-width:860px) {
+      .crm-layout { grid-template-columns:1fr; }
+      .client-list-panel { position:static; }
+      .client-list { max-height:240px; }
+      .contact-grid { grid-template-columns:1fr; }
+      .interaction-add { grid-template-columns:1fr 1fr; }
+      .reminder-add { grid-template-columns:1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading-screen" style="display:flex"><p style="color:var(--text2)">Laen...</p></div>
+
+<div id="denied-screen">
+  <h2>Ligipääs keelatud</h2>
+  <p>Sul pole admin õigusi.</p>
+  <a href="../" class="nav-link">← Skoor avalehele</a>
+</div>
+
+<div id="app">
+  <script src="nav.js"></script>
+
+  <main>
+    <p class="page-intro">
+      Klientide suhtehaldus: kontaktisikud, suhtluslogi ja kuupäevaga järeltegevuse meeldetuletused.
+      Tähtaja hommikul saadab Skoor meeldetuletuse Slacki #skoor kanalisse ja e-postiga.
+    </p>
+
+    <div class="upcoming" id="upcoming-panel"></div>
+
+    <div class="crm-layout">
+      <aside class="client-list-panel">
+        <input type="search" id="client-search" placeholder="Otsi klienti…" autocomplete="off">
+        <div class="client-list" id="client-list"></div>
+        <div class="client-list-count" id="client-list-count"></div>
+      </aside>
+      <section class="detail-panel" id="detail-panel">
+        <div class="detail-empty">← Vali vasakult klient, et näha kontakte, suhtluslogi ja meeldetuletusi.</div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL  = 'https://lpehwgpitfowhyiaxrhe.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_Y5pG6JcaFE5OFXlpgH9q-Q_B-mW504U';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let currentUser = null;
+let isAdmin = false;
+let clients = [];                 // {id, name}
+let admins = [];                  // {user_id, display_name}
+let openReminders = [];           // all done=false (across clients) for top panel
+let selectedClientId = null;
+let detail = { contacts: [], interactions: [], reminders: [] };
+let clientSearch = '';
+let saveTimers = {};
+
+const KIND_ICON = { call:'📞', email:'✉️', meeting:'🤝', note:'📝', other:'•' };
+const KIND_LABEL = { call:'Kõne', email:'E-post', meeting:'Kohtumine', note:'Märkus', other:'Muu' };
+
+// ── Helpers ──────────────────────────────────────────────────────
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function showToast(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} visible`;clearTimeout(showToast._h);showToast._h=setTimeout(()=>t.classList.remove('visible'),2200);}
+function todayISO(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function fmtDate(iso){if(!iso)return '';const [y,m,d]=iso.slice(0,10).split('-');return `${d}.${m}.${y}`;}
+function fmtDateTime(iso){if(!iso)return '';const dt=new Date(iso);return `${String(dt.getDate()).padStart(2,'0')}.${String(dt.getMonth()+1).padStart(2,'0')}.${dt.getFullYear()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;}
+function daysUntil(iso){const t=new Date(todayISO()+'T00:00:00');const d=new Date(iso.slice(0,10)+'T00:00:00');return Math.round((d-t)/86400000);}
+function dueClass(iso){const n=daysUntil(iso);if(n<0)return 'overdue';if(n===0)return 'today';if(n<=7)return 'soon';return 'future';}
+function dueLabel(iso){const n=daysUntil(iso);if(n<0)return `${Math.abs(n)} p hilinenud`;if(n===0)return 'TÄNA';if(n===1)return 'homme';if(n<=7)return `${n} p pärast`;return fmtDate(iso);}
+function adminName(uid){if(!uid)return null;const a=admins.find(x=>x.user_id===uid);return a?.display_name||'Admin';}
+function clientName(id){return (clients.find(c=>c.id===id)||{}).name||'?';}
+
+// ── Init ─────────────────────────────────────────────────────────
+async function init(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ window.location.href='../'; return; }
+  currentUser = session.user;
+
+  const { data:adminRow } = await sb.from('admins').select('user_id').eq('user_id',currentUser.id).maybeSingle();
+  isAdmin = !!adminRow;
+  if(!isAdmin){
+    document.getElementById('loading-screen').style.display='none';
+    document.getElementById('denied-screen').style.display='flex';
+    return;
+  }
+
+  await Promise.all([loadClients(), loadAdmins(), loadOpenReminders()]);
+
+  document.getElementById('loading-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+
+  renderUpcoming();
+  renderClientList();
+  bindUI();
+
+  await SkoorTimerBanner.init({ sb, currentUser, getClientName:(id)=>clientName(id) });
+  sb.auth.onAuthStateChange((e)=>{ if(e==='SIGNED_OUT') window.location.href='../'; });
+}
+
+async function loadClients(){
+  const { data, error } = await sb.from('clients').select('id, name').order('name');
+  if(error){ console.error('clients',error); return; }
+  clients = data||[];
+}
+async function loadAdmins(){
+  const { data, error } = await sb.from('admins').select('user_id, display_name');
+  if(error){ console.error('admins',error); return; }
+  admins = data||[];
+}
+async function loadOpenReminders(){
+  const { data, error } = await sb.from('crm_reminders')
+    .select('id, client_id, title, details, due_date, assigned_to')
+    .eq('done', false).order('due_date');
+  if(error){ console.error('open reminders',error); return; }
+  openReminders = data||[];
+}
+
+// ── Top panel: eelseisvad meeldetuletused ────────────────────────
+function renderUpcoming(){
+  const el = document.getElementById('upcoming-panel');
+  const items = [...openReminders].sort((a,b)=>a.due_date.localeCompare(b.due_date));
+  const overdue = items.filter(r=>daysUntil(r.due_date)<0).length;
+  const today   = items.filter(r=>daysUntil(r.due_date)===0).length;
+
+  let countTxt = `${items.length} avatud`;
+  if(overdue) countTxt += ` · ${overdue} hilinenud`;
+  if(today)   countTxt += ` · ${today} täna`;
+
+  const rows = items.map(r=>{
+    const cls = dueClass(r.due_date);
+    return `
+      <div class="reminder-line">
+        <span class="rl-due ${cls}">${escapeHtml(dueLabel(r.due_date))}</span>
+        <div class="rl-body">
+          <div class="rl-title">${escapeHtml(r.title)}</div>
+          <div class="rl-meta">
+            <span class="rl-client" data-open-client="${r.client_id}">${escapeHtml(clientName(r.client_id))}</span>
+            ${r.assigned_to?` · ${escapeHtml(adminName(r.assigned_to))}`:''}
+            · ${fmtDate(r.due_date)}
+          </div>
+        </div>
+        <button class="btn-secondary rl-done" data-done-reminder="${r.id}">✓ Tehtud</button>
+      </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="upcoming-head">
+      <span>🔔</span>
+      <span class="upcoming-title">Eelseisvad meeldetuletused</span>
+      <span class="upcoming-count">${escapeHtml(countTxt)}</span>
+    </div>
+    ${rows || '<div class="upcoming-empty">Avatud meeldetuletusi pole. Lisa kliendile järeltegevus allpool.</div>'}
+  `;
+
+  el.querySelectorAll('[data-open-client]').forEach(b=>b.addEventListener('click',()=>selectClient(b.dataset.openClient)));
+  el.querySelectorAll('[data-done-reminder]').forEach(b=>b.addEventListener('click',()=>markReminderDone(b.dataset.doneReminder,true)));
+}
+
+// ── Client list ──────────────────────────────────────────────────
+function renderClientList(){
+  const list = document.getElementById('client-list');
+  const countEl = document.getElementById('client-list-count');
+  const q = clientSearch.trim().toLowerCase();
+  const filtered = q ? clients.filter(c=>c.name.toLowerCase().includes(q)) : clients;
+
+  // open reminder count per client
+  const remCount = {};
+  openReminders.forEach(r=>{ remCount[r.client_id]=(remCount[r.client_id]||0)+1; });
+
+  list.innerHTML = filtered.map(c=>{
+    const n = remCount[c.id]||0;
+    const active = c.id===selectedClientId ? ' active' : '';
+    return `<button class="client-list-item${active}" data-client="${c.id}">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(c.name)}</span>
+      ${n?`<span class="cli-badge" title="${n} avatud meeldetuletust">${n}</span>`:''}
+    </button>`;
+  }).join('') || '<div class="empty-msg">Kliente ei leitud.</div>';
+
+  countEl.textContent = q ? `${filtered.length} / ${clients.length}` : `${clients.length} klienti`;
+  list.querySelectorAll('[data-client]').forEach(b=>b.addEventListener('click',()=>selectClient(b.dataset.client)));
+}
+
+// ── Select client → load + render detail ─────────────────────────
+async function selectClient(clientId){
+  selectedClientId = clientId;
+  renderClientList();
+  const panel = document.getElementById('detail-panel');
+  panel.innerHTML = '<div class="detail-empty">Laen…</div>';
+
+  const [ct, it, rm] = await Promise.all([
+    sb.from('crm_contacts').select('*').eq('client_id',clientId).order('is_primary',{ascending:false}).order('created_at'),
+    sb.from('crm_interactions').select('*').eq('client_id',clientId).order('occurred_at',{ascending:false}),
+    sb.from('crm_reminders').select('*').eq('client_id',clientId).order('done').order('due_date'),
+  ]);
+  if(ct.error||it.error||rm.error){ showToast('Viga andmete laadimisel','error'); console.error(ct.error,it.error,rm.error); }
+  detail.contacts = ct.data||[];
+  detail.interactions = it.data||[];
+  detail.reminders = rm.data||[];
+  renderDetail();
+}
+
+function renderDetail(){
+  const panel = document.getElementById('detail-panel');
+  if(!selectedClientId){ panel.innerHTML='<div class="detail-empty">← Vali klient.</div>'; return; }
+  const name = clientName(selectedClientId);
+
+  panel.innerHTML = `
+    <div class="detail-head"><div class="detail-name">${escapeHtml(name)}</div></div>
+    ${renderContactsSection()}
+    ${renderRemindersSection()}
+    ${renderInteractionsSection()}
+  `;
+  bindDetail();
+}
+
+// ── Contacts ─────────────────────────────────────────────────────
+function renderContactsSection(){
+  const rows = detail.contacts.map(c=>`
+    <div class="contact-card" data-contact="${c.id}">
+      <div class="contact-grid">
+        <div><div class="contact-field-label">Nimi</div>
+          <input data-cf="name" data-id="${c.id}" value="${escapeHtml(c.name||'')}" placeholder="Nimi"></div>
+        <div><div class="contact-field-label">Roll</div>
+          <input data-cf="role" data-id="${c.id}" value="${escapeHtml(c.role||'')}" placeholder="nt juhatuse liige"></div>
+        <div><div class="contact-field-label">E-post</div>
+          <input data-cf="email" data-id="${c.id}" value="${escapeHtml(c.email||'')}" placeholder="email@…"></div>
+        <div><div class="contact-field-label">Telefon</div>
+          <input data-cf="phone" data-id="${c.id}" value="${escapeHtml(c.phone||'')}" placeholder="+372…"></div>
+      </div>
+      <div class="contact-foot">
+        <label class="primary-toggle"><input type="checkbox" data-cf="is_primary" data-id="${c.id}" ${c.is_primary?'checked':''}> Peamine kontakt</label>
+        <span class="save-status" data-cstatus="${c.id}"></span>
+        <button class="btn-danger" data-del-contact="${c.id}">Kustuta</button>
+      </div>
+    </div>`).join('');
+
+  return `
+    <div class="crm-section">
+      <div class="crm-section-head">
+        <span>👤</span><span class="crm-section-title">Kontaktid</span>
+        <span class="crm-section-count">${detail.contacts.length}</span>
+      </div>
+      ${rows || '<div class="empty-msg">Kontakte pole veel lisatud.</div>'}
+      <button class="btn-secondary" id="add-contact" style="margin-top:10px">+ Lisa kontakt</button>
+    </div>`;
+}
+
+// ── Reminders ────────────────────────────────────────────────────
+function renderRemindersSection(){
+  const open = detail.reminders.filter(r=>!r.done);
+  const done = detail.reminders.filter(r=>r.done);
+  const renderRem = (r)=>{
+    const cls = r.done ? 'future' : dueClass(r.due_date);
+    return `
+      <div class="rem-item ${r.done?'is-done':''}" data-rem="${r.id}">
+        <button class="rem-check ${r.done?'done':''}" data-toggle-rem="${r.id}" title="${r.done?'Märgi tegemata':'Märgi tehtud'}">${r.done?'✓':''}</button>
+        <div class="rem-body">
+          <div class="rem-title">${escapeHtml(r.title)}</div>
+          ${r.details?`<div class="rem-details">${escapeHtml(r.details)}</div>`:''}
+          <div class="rem-meta">
+            <span class="rem-due ${cls}">${r.done?('tehtud '+fmtDate(r.done_at)) : escapeHtml(dueLabel(r.due_date))}</span>
+            <span style="color:var(--text3)"> · ${fmtDate(r.due_date)}${r.assigned_to?(' · '+escapeHtml(adminName(r.assigned_to))):''}</span>
+          </div>
+        </div>
+        <button class="btn-danger" data-del-rem="${r.id}">×</button>
+      </div>`;
+  };
+  const assignOpts = `<option value="">— kõik —</option>` + admins.map(a=>
+    `<option value="${a.user_id}" ${a.user_id===currentUser.id?'selected':''}>${escapeHtml(a.display_name||'Admin')}</option>`).join('');
+
+  return `
+    <div class="crm-section">
+      <div class="crm-section-head">
+        <span>🔔</span><span class="crm-section-title">Meeldetuletused</span>
+        <span class="crm-section-count">${open.length} avatud${done.length?` · ${done.length} tehtud`:''}</span>
+      </div>
+      <div class="reminder-add">
+        <div><label>Mida teha</label><input id="rem-title" placeholder="nt Helista, küsi Q2 dokumendid"></div>
+        <div><label>Tähtaeg</label><input type="date" id="rem-due" value="${todayISO()}"></div>
+        <div><label>Vastutaja</label><select id="rem-assign">${assignOpts}</select></div>
+        <button class="btn-primary" id="add-reminder">Lisa</button>
+      </div>
+      <div class="reminder-add-details"><input id="rem-details" placeholder="Lisamärkus (valikuline)"></div>
+      ${open.map(renderRem).join('') || '<div class="empty-msg">Avatud meeldetuletusi pole.</div>'}
+      ${done.length?`<div style="margin-top:10px">${done.map(renderRem).join('')}</div>`:''}
+    </div>`;
+}
+
+// ── Interactions / timeline ──────────────────────────────────────
+function renderInteractionsSection(){
+  const kindOpts = Object.keys(KIND_LABEL).map(k=>`<option value="${k}">${KIND_ICON[k]} ${KIND_LABEL[k]}</option>`).join('');
+  const rows = detail.interactions.map(i=>`
+    <div class="timeline-item" data-int="${i.id}">
+      <div class="ti-icon" title="${escapeHtml(KIND_LABEL[i.kind]||i.kind)}">${KIND_ICON[i.kind]||'•'}</div>
+      <div class="ti-body">
+        <div class="ti-summary">${escapeHtml(i.summary)}</div>
+        <div class="ti-meta">${fmtDateTime(i.occurred_at)}${i.created_by?(' · '+escapeHtml(adminName(i.created_by))):''}</div>
+      </div>
+      <button class="btn-danger ti-del" data-del-int="${i.id}">×</button>
+    </div>`).join('');
+
+  return `
+    <div class="crm-section">
+      <div class="crm-section-head">
+        <span>💬</span><span class="crm-section-title">Suhtluslogi</span>
+        <span class="crm-section-count">${detail.interactions.length}</span>
+      </div>
+      <div class="interaction-add">
+        <div><label>Tüüp</label><select id="int-kind">${kindOpts}</select></div>
+        <div><label>Millal</label><input type="date" id="int-date" value="${todayISO()}"></div>
+        <div><label>Kirjeldus</label><input id="int-summary" placeholder="nt Helistasin, lubasid arved saata"></div>
+        <button class="btn-primary" id="add-interaction">Lisa</button>
+      </div>
+      ${rows || '<div class="empty-msg">Logikirjeid pole veel.</div>'}
+    </div>`;
+}
+
+// ── Detail event binding ─────────────────────────────────────────
+function bindDetail(){
+  const panel = document.getElementById('detail-panel');
+
+  // contacts
+  panel.querySelector('#add-contact')?.addEventListener('click', addContact);
+  panel.querySelectorAll('[data-cf]').forEach(el=>{
+    const ev = el.type==='checkbox' ? 'change' : 'input';
+    el.addEventListener(ev, ()=>{
+      const val = el.type==='checkbox' ? el.checked : el.value;
+      debounceContact(el.dataset.id, el.dataset.cf, val);
+    });
+  });
+  panel.querySelectorAll('[data-del-contact]').forEach(b=>b.addEventListener('click',()=>deleteContact(b.dataset.delContact)));
+
+  // reminders
+  panel.querySelector('#add-reminder')?.addEventListener('click', addReminder);
+  panel.querySelectorAll('[data-toggle-rem]').forEach(b=>b.addEventListener('click',()=>{
+    const r = detail.reminders.find(x=>x.id===b.dataset.toggleRem);
+    markReminderDone(b.dataset.toggleRem, !r.done);
+  }));
+  panel.querySelectorAll('[data-del-rem]').forEach(b=>b.addEventListener('click',()=>deleteReminder(b.dataset.delRem)));
+
+  // interactions
+  panel.querySelector('#add-interaction')?.addEventListener('click', addInteraction);
+  panel.querySelectorAll('[data-del-int]').forEach(b=>b.addEventListener('click',()=>deleteInteraction(b.dataset.delInt)));
+}
+
+// ── Contacts CRUD ────────────────────────────────────────────────
+async function addContact(){
+  const { data, error } = await sb.from('crm_contacts')
+    .insert({ client_id:selectedClientId, name:'', created_by:currentUser.id })
+    .select().single();
+  if(error){ showToast('Viga: '+error.message,'error'); return; }
+  detail.contacts.push(data);
+  renderDetail();
+  // fookus uue kontakti nime väljale
+  document.querySelector(`[data-cf="name"][data-id="${data.id}"]`)?.focus();
+}
+function debounceContact(id, field, value){
+  const key=`c|${id}|${field}`;
+  clearTimeout(saveTimers[key]);
+  const st=document.querySelector(`[data-cstatus="${id}"]`); if(st) st.textContent='…';
+  saveTimers[key]=setTimeout(()=>saveContact(id,field,value),500);
+}
+async function saveContact(id, field, value){
+  const allowed=['name','role','email','phone','is_primary'];
+  if(!allowed.includes(field)) return;
+  let v = field==='is_primary' ? !!value : ((value||'').trim()||null);
+  const patch={ [field]:v, updated_at:new Date().toISOString() };
+  const { error } = await sb.from('crm_contacts').update(patch).eq('id',id);
+  const st=document.querySelector(`[data-cstatus="${id}"]`);
+  if(error){ if(st)st.textContent=''; showToast('Viga: '+error.message,'error'); return; }
+  const c=detail.contacts.find(x=>x.id===id); if(c) c[field]=v;
+  if(st){ st.textContent='✓ salvestatud'; setTimeout(()=>{ if(st.textContent==='✓ salvestatud') st.textContent=''; },1800); }
+}
+async function deleteContact(id){
+  if(!confirm('Kustuta see kontakt?')) return;
+  const { error } = await sb.from('crm_contacts').delete().eq('id',id);
+  if(error){ showToast('Viga: '+error.message,'error'); return; }
+  detail.contacts = detail.contacts.filter(c=>c.id!==id);
+  renderDetail(); showToast('Kontakt kustutatud');
+}
+
+// ── Reminders CRUD ───────────────────────────────────────────────
+async function addReminder(){
+  const title=document.getElementById('rem-title').value.trim();
+  const due=document.getElementById('rem-due').value;
+  const assign=document.getElementById('rem-assign').value||null;
+  const details=document.getElementById('rem-details').value.trim()||null;
+  if(!title){ showToast('Sisesta mida teha','error'); return; }
+  if(!due){ showToast('Vali tähtaeg','error'); return; }
+  const { data, error } = await sb.from('crm_reminders')
+    .insert({ client_id:selectedClientId, title, due_date:due, details, assigned_to:assign, created_by:currentUser.id })
+    .select().single();
+  if(error){ showToast('Viga: '+error.message,'error'); return; }
+  detail.reminders.push(data);
+  openReminders.push({ id:data.id, client_id:data.client_id, title:data.title, details:data.details, due_date:data.due_date, assigned_to:data.assigned_to });
+  renderDetail(); renderUpcoming(); renderClientList();
+  showToast('Meeldetuletus lisatud');
+}
+async function markReminderDone(id, done){
+  const patch = done ? { done:true, done_at:new Date().toISOString() } : { done:false, done_at:null };
+  const { error } = await sb.from('crm_reminders').update(patch).eq('id',id);
+  if(error){ showToast('Viga: '+error.message,'error'); return; }
+  const r=detail.reminders.find(x=>x.id===id); if(r){ r.done=patch.done; r.done_at=patch.done_at; }
+  if(done){ openReminders=openReminders.filter(x=>x.id!==id); }
+  else if(!openReminders.find(x=>x.id===id) && r){ openReminders.push({ id:r.id, client_id:r.client_id, title:r.title, details:r.details, due_date:r.due_date, assigned_to:r.assigned_to }); }
+  if(selectedClientId) renderDetail();
+  renderUpcoming(); renderClientList();
+  showToast(done?'Märgitud tehtuks':'Taasavatud');
+}
+async function deleteReminder(id){
+  if(!confirm('Kustuta meeldetuletus?')) return;
+  const { error } = await sb.from('crm_reminders').delete().eq('id',id);
+  if(error){ showToast('Viga: '+error.message,'error'); return; }
+  detail.reminders=detail.reminders.filter(r=>r.id!==id);
+  openReminders=openReminders.filter(r=>r.id!==id);
+  renderDetail(); renderUpcoming(); renderClientList();
+  showToast('Kustutatud');
+}
+
+// ── Interactions CRUD ────────────────────────────────────────────
+async function addInteraction(){
+  const kind=document.getElementById('int-kind').value;
+  const date=document.getElementById('int-date').value;
+  const summary=document.getElementById('int-summary').value.trim();
+  if(!summary){ showToast('Sisesta kirjeldus','error'); return; }
+  // date (päev) → timestamptz keskpäev, et TZ ei nihutaks päeva
+  const occurred = date ? new Date(date+'T12:00:00').toISOString() : new Date().toISOString();
+  const { data, error } = await sb.from('crm_interactions')
+    .insert({ client_id:selectedClientId, kind, summary, occurred_at:occurred, created_by:currentUser.id })
+    .select().single();
+  if(error){ showToast('Viga: '+error.message,'error'); return; }
+  detail.interactions.unshift(data);
+  renderDetail(); showToast('Logikirje lisatud');
+}
+async function deleteInteraction(id){
+  if(!confirm('Kustuta logikirje?')) return;
+  const { error } = await sb.from('crm_interactions').delete().eq('id',id);
+  if(error){ showToast('Viga: '+error.message,'error'); return; }
+  detail.interactions=detail.interactions.filter(i=>i.id!==id);
+  renderDetail(); showToast('Kustutatud');
+}
+
+// ── UI ───────────────────────────────────────────────────────────
+function bindUI(){
+  document.getElementById('logout-btn').addEventListener('click', ()=>sb.auth.signOut());
+  document.getElementById('client-search').addEventListener('input',(e)=>{ clientSearch=e.target.value; renderClientList(); });
+}
+
+init();
+</script>
+</body>
+</html>
