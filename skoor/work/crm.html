@@ -291,7 +291,7 @@ async function init(){
 }
 
 async function loadClients(){
-  const { data, error } = await sb.from('clients').select('id, name').order('name');
+  const { data, error } = await sb.from('clients').select('id, name, address, merit_evemee_reg_no').order('name');
   if(error){ console.error('clients',error); return; }
   clients = data||[];
 }
@@ -395,15 +395,40 @@ async function selectClient(clientId){
 function renderDetail(){
   const panel = document.getElementById('detail-panel');
   if(!selectedClientId){ panel.innerHTML='<div class="detail-empty">← Vali klient.</div>'; return; }
-  const name = clientName(selectedClientId);
+  const client = clients.find(c=>c.id===selectedClientId) || {};
+  const name = client.name || clientName(selectedClientId);
 
   panel.innerHTML = `
     <div class="detail-head"><div class="detail-name">${escapeHtml(name)}</div></div>
+    ${renderClientInfoSection(client)}
     ${renderContactsSection()}
     ${renderRemindersSection()}
     ${renderInteractionsSection()}
   `;
   bindDetail();
+}
+
+// ── Kliendi andmed (reg nr + aadress) ────────────────────────────
+function renderClientInfoSection(client){
+  return `
+    <div class="crm-section">
+      <div class="crm-section-head">
+        <span>🏢</span><span class="crm-section-title">Kliendi andmed</span>
+        <span class="save-status" data-client-status="${client.id}" style="margin-left:auto;font-size:11px;color:var(--text3)"></span>
+      </div>
+      <div class="contact-grid">
+        <div>
+          <div class="contact-field-label">Registrikood</div>
+          <input data-client-field="merit_evemee_reg_no" data-id="${client.id}"
+                 value="${escapeHtml(client.merit_evemee_reg_no || '')}" placeholder="nt 16914274">
+        </div>
+        <div>
+          <div class="contact-field-label">Aadress</div>
+          <input data-client-field="address" data-id="${client.id}"
+                 value="${escapeHtml(client.address || '')}" placeholder="Tänav, indeks linn, maakond">
+        </div>
+      </div>
+    </div>`;
 }
 
 // ── Contacts ─────────────────────────────────────────────────────
@@ -512,6 +537,11 @@ function renderInteractionsSection(){
 function bindDetail(){
   const panel = document.getElementById('detail-panel');
 
+  // kliendi andmed (reg nr + aadress)
+  panel.querySelectorAll('[data-client-field]').forEach(el=>{
+    el.addEventListener('input', ()=>debounceClientField(el.dataset.id, el.dataset.clientField, el.value));
+  });
+
   // contacts
   panel.querySelector('#add-contact')?.addEventListener('click', addContact);
   panel.querySelectorAll('[data-cf]').forEach(el=>{
@@ -534,6 +564,24 @@ function bindDetail(){
   // interactions
   panel.querySelector('#add-interaction')?.addEventListener('click', addInteraction);
   panel.querySelectorAll('[data-del-int]').forEach(b=>b.addEventListener('click',()=>deleteInteraction(b.dataset.delInt)));
+}
+
+// ── Kliendi andmed salvestus ─────────────────────────────────────
+function debounceClientField(id, field, value){
+  const key=`cl|${id}|${field}`;
+  clearTimeout(saveTimers[key]);
+  const st=document.querySelector(`[data-client-status="${id}"]`); if(st) st.textContent='…';
+  saveTimers[key]=setTimeout(()=>saveClientField(id,field,value),500);
+}
+async function saveClientField(id, field, rawValue){
+  const allowed=['address','merit_evemee_reg_no'];
+  if(!allowed.includes(field)) return;
+  const v=(rawValue||'').trim()||null;
+  const { error } = await sb.from('clients').update({ [field]:v }).eq('id',id);
+  const st=document.querySelector(`[data-client-status="${id}"]`);
+  if(error){ if(st)st.textContent=''; showToast('Viga: '+error.message,'error'); return; }
+  const c=clients.find(x=>x.id===id); if(c) c[field]=v;
+  if(st){ st.textContent='✓ salvestatud'; setTimeout(()=>{ if(st.textContent==='✓ salvestatud') st.textContent=''; },1800); }
 }
 
 // ── Contacts CRUD ────────────────────────────────────────────────
