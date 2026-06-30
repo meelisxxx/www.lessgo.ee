@@ -170,21 +170,85 @@
 
     main { padding: 24px; max-width: 1200px; margin: 0 auto; width: 100%; }
 
-    /* Banner */
-    .red-banner {
+    /* Ohus tööd — proaktiivne paneel (üle tähtaja või tähtaeg ≤ 3 päeva) */
+    .atrisk-panel {
       display: none;
-      align-items: center;
-      gap: 14px;
-      padding: 14px 18px;
-      background: linear-gradient(90deg, rgba(239,68,68,0.20) 0%, rgba(239,68,68,0.08) 100%);
-      border: 1px solid rgba(239,68,68,0.4);
-      border-radius: var(--radius);
       margin-bottom: 20px;
+      background: var(--bg2);
+      border: 1px solid rgba(239,68,68,0.35);
+      border-radius: var(--radius);
+      overflow: hidden;
     }
-    .red-banner.visible { display: flex; }
-    .red-banner .icon { font-size: 22px; }
-    .red-banner .text { flex: 1; font-size: 14px; }
-    .red-banner .text strong { color: var(--neg); }
+    .atrisk-panel.visible { display: block; }
+    .atrisk-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: rgba(239,68,68,0.10);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .atrisk-head .icon { font-size: 16px; }
+    .atrisk-head .title { font-size: 14px; font-weight: 700; }
+    .atrisk-countbadge {
+      background: var(--neg);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      min-width: 20px;
+      text-align: center;
+      padding: 1px 7px;
+      border-radius: 999px;
+      font-variant-numeric: tabular-nums;
+    }
+    .atrisk-head .atrisk-sub { font-size: 12px; color: var(--text3); margin-left: 2px; }
+    .atrisk-list { display: flex; flex-direction: column; max-height: 320px; overflow-y: auto; }
+    .atrisk-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--hover-soft);
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .atrisk-row:last-child { border-bottom: none; }
+    .atrisk-row:hover { background: var(--hover-faint); }
+    .atrisk-due {
+      flex-shrink: 0;
+      min-width: 64px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .atrisk-due.overdue { background: rgba(239,68,68,0.16); color: var(--neg); }
+    .atrisk-due.soon    { background: rgba(245,158,11,0.16); color: var(--warn); }
+    .atrisk-date {
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+      color: var(--text3);
+      font-size: 12px;
+      width: 84px;
+    }
+    .atrisk-client {
+      flex-shrink: 0;
+      color: var(--text2);
+      font-weight: 600;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .atrisk-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    @media (max-width: 640px) {
+      .atrisk-date { display: none; }
+      .atrisk-row { flex-wrap: wrap; gap: 8px; }
+    }
 
     /* Period + filter bar */
     .period-bar {
@@ -557,10 +621,8 @@
 
   <main>
 
-    <div class="red-banner" id="red-banner">
-      <div class="icon">🚨</div>
-      <div class="text"><strong id="red-count">—</strong> <span id="red-text">klient vajab tähelepanu.</span></div>
-    </div>
+    <!-- Ohus tööd — konkreetsed üle tähtaja / peagi aeguvad tööd (renderdatakse render()-is) -->
+    <div class="atrisk-panel" id="atrisk-panel"></div>
 
     <!-- Period + filter bar -->
     <div class="period-bar">
@@ -964,17 +1026,8 @@ function render() {
     tile.classList.toggle('gray',   s === 'gray');
   });
 
-  // Banner
-  const banner = document.getElementById('red-banner');
-  if (counts.red > 0) {
-    banner.classList.add('visible');
-    document.getElementById('red-count').textContent = counts.red;
-    document.getElementById('red-text').textContent = counts.red === 1
-      ? 'klient vajab tähelepanu (üle tähtaja või tähtaeg ≤ 3 päeva).'
-      : 'klienti vajavad tähelepanu (üle tähtaja või tähtaeg ≤ 3 päeva).';
-  } else {
-    banner.classList.remove('visible');
-  }
+  // Ohus tööd — proaktiivne paneel konkreetsete töödega (asendab varasema klientide-bänneri)
+  renderAtRiskPanel();
 
   // Period info — "tehtud" arvestab selle kuu töid; varasemast kuust kandunud tööd näidatakse eraldi.
   const currentTasks = tasks.filter(t => !isCarried(t));
@@ -1020,6 +1073,60 @@ function render() {
 
   stack.innerHTML = filteredGroups.map(renderGroup).join('');
   bindRowEvents();
+}
+
+// Ohus tööd: avatud (todo) tööd, mis on üle tähtaja või tähtaeg ≤ 3 päeva.
+// Blokeeritud jätame välja (sama loogika kui clientStatus 'red') — need ootavad teadlikult.
+// Arvutatakse hetkel laetud `tasks` peal (kuu-vaates sisaldab carry-over'it varasematest kuudest).
+function atRiskTasks() {
+  return tasks.filter(t =>
+    t.status !== 'done' && t.status !== 'blocked' && daysBetween(t.due_date) <= 3
+  );
+}
+
+function renderAtRiskPanel() {
+  const panel = document.getElementById('atrisk-panel');
+  const priorityOrder = { high: 0, medium: 1, low: 2 };
+  const atRisk = atRiskTasks().sort((a, b) =>
+    a.due_date.localeCompare(b.due_date) ||
+    (priorityOrder[a.priority] - priorityOrder[b.priority])
+  );
+
+  if (atRisk.length === 0) {
+    panel.classList.remove('visible');
+    panel.innerHTML = '';
+    return;
+  }
+
+  const rows = atRisk.map(t => {
+    const d = daysBetween(t.due_date);
+    let cls, txt;
+    if (d < 0)        { cls = 'overdue'; txt = `${-d} p üle`; }
+    else if (d === 0) { cls = 'overdue'; txt = 'täna'; }
+    else              { cls = 'soon';    txt = d === 1 ? 'homme' : `${d} p`; }
+    return `
+      <div class="atrisk-row" data-atrisk="${t.id}" title="Ava ülesanne">
+        <span class="atrisk-due ${cls}">${txt}</span>
+        <span class="atrisk-date">${fmtDate(t.due_date)}</span>
+        <span class="atrisk-client">${escapeHtml(clientName(t.client_id))}</span>
+        <span class="atrisk-name">${escapeHtml(t.name)}</span>
+        <span class="pill priority-${t.priority}">${priorityLabel(t.priority)}</span>
+      </div>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <div class="atrisk-head">
+      <span class="icon">⚠️</span>
+      <span class="title">Ohus tööd</span>
+      <span class="atrisk-countbadge">${atRisk.length}</span>
+      <span class="atrisk-sub">üle tähtaja või tähtaeg ≤ 3 päeva</span>
+    </div>
+    <div class="atrisk-list">${rows}</div>`;
+  panel.classList.add('visible');
+
+  panel.querySelectorAll('[data-atrisk]').forEach(row => {
+    row.addEventListener('click', () => openEditModal(row.dataset.atrisk));
+  });
 }
 
 function renderGroup({ client, tasks: cTasks, status }) {
