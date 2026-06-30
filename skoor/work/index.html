@@ -237,14 +237,16 @@
     }
     .atrisk-client {
       flex-shrink: 0;
+      width: 180px;
       color: var(--text2);
       font-weight: 600;
-      max-width: 180px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .atrisk-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .atrisk-row.running { background: rgba(16,185,129,0.06); }
+    .atrisk-row .btn-icon { flex-shrink: 0; }
     @media (max-width: 640px) {
       .atrisk-date { display: none; }
       .atrisk-row { flex-wrap: wrap; gap: 8px; }
@@ -1104,13 +1106,17 @@ function renderAtRiskPanel() {
     if (d < 0)        { cls = 'overdue'; txt = `${-d} p üle`; }
     else if (d === 0) { cls = 'overdue'; txt = 'täna'; }
     else              { cls = 'soon';    txt = d === 1 ? 'homme' : `${d} p`; }
+    const isRunningHere = activeTimer && activeTimer.task_id === t.id;
+    const timerBtn = isRunningHere
+      ? `<button class="btn-icon timer-stop" data-atrisk-stop="${t.id}" title="Peata timer">⏹</button>`
+      : `<button class="btn-icon timer-start" data-atrisk-start="${t.id}" title="Käivita timer ja asu tööle">▶</button>`;
     return `
-      <div class="atrisk-row" data-atrisk="${t.id}" title="Ava ülesanne">
+      <div class="atrisk-row ${isRunningHere ? 'running' : ''}" data-atrisk="${t.id}" title="Ava ülesanne">
         <span class="atrisk-due ${cls}">${txt}</span>
         <span class="atrisk-date">${fmtDate(t.due_date)}</span>
         <span class="atrisk-client">${escapeHtml(clientName(t.client_id))}</span>
         <span class="atrisk-name">${escapeHtml(t.name)}</span>
-        <span class="pill priority-${t.priority}">${priorityLabel(t.priority)}</span>
+        ${timerBtn}
       </div>`;
   }).join('');
 
@@ -1126,6 +1132,12 @@ function renderAtRiskPanel() {
 
   panel.querySelectorAll('[data-atrisk]').forEach(row => {
     row.addEventListener('click', () => openEditModal(row.dataset.atrisk));
+  });
+  panel.querySelectorAll('[data-atrisk-start]').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); startTimerForTask(btn.dataset.atriskStart); });
+  });
+  panel.querySelectorAll('[data-atrisk-stop]').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); stopTaskTimer(btn.dataset.atriskStop); });
   });
 }
 
