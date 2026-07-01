@@ -81,8 +81,10 @@
     .sk-link:hover { color: var(--text); background: var(--hover-strong); opacity: 1; }
     .sk-link:active { transform: scale(0.97); }
     .sk-link.active {
-      color: var(--text); background: rgba(16,185,129,0.10);
-      border-color: rgba(16,185,129,0.30);
+      color: var(--text); font-weight: 600;
+      background: rgba(16,185,129,0.14);
+      border-color: rgba(16,185,129,0.55);
+      box-shadow: inset 3px 0 0 var(--accent);
     }
 
     .sk-bottom {
