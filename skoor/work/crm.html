@@ -206,6 +206,15 @@
     .field { margin-bottom:14px; }
     .field label { display:block; margin-bottom:5px; }
     .field-row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .field-label-row { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+    .field-label-row label { margin:0; }
+    .copy-mini { margin-left:auto; padding:2px 8px; font-size:11px; }
+    .sys-badge {
+      display:inline-block; font-size:10px; font-weight:700; letter-spacing:0.3px;
+      background:rgba(129,140,248,0.15); color:var(--info); border-radius:4px; padding:1px 6px; margin-right:6px;
+    }
+    .ti-sent { padding:2px 8px; font-size:11px; }
+    .ti-sent-done { color:var(--pos); font-weight:600; }
 
     .var-chips { display:flex; flex-wrap:wrap; gap:6px; margin:2px 0 4px; }
     .var-chip {
@@ -312,22 +321,25 @@
         <textarea id="composer-docs" rows="3" placeholder="nt&#10;- 14.05 · Selver AS · 42.50&#10;- 20.05 · Tele2 · 24.20"></textarea>
       </div>
       <div class="field">
-        <label>Teema</label>
+        <div class="field-label-row"><label>Teema</label>
+          <button class="btn-ghost copy-mini" id="copy-subject">⧉ Kopeeri teema</button></div>
         <input id="composer-subject" placeholder="E-kirja teema">
       </div>
       <div class="field">
-        <label>Sisu</label>
+        <div class="field-label-row"><label>Sisu</label>
+          <button class="btn-ghost copy-mini" id="copy-body">⧉ Kopeeri sisu</button></div>
         <textarea id="composer-body" rows="10" placeholder="Vali ülalt mall…"></textarea>
-        <div class="field-hint">Mall täidab {klient}, {kontakt}, {kuu} ja {puuduvad_dokumendid} automaatselt. Muuda teksti vabalt enne saatmist.</div>
+        <div class="field-hint">Mall täidab {klient}, {kontakt}, {kuu} ja {puuduvad_dokumendid} automaatselt. Muuda teksti vabalt enne saatmist. Väga pika kirja puhul kasuta „Kopeeri sisu" ja kleebi Gmaili.</div>
       </div>
       <div class="field-hint" id="composer-email-hint"></div>
+      <div class="field-hint" style="color:var(--warn)">⚠ „Ava Gmailis" avab brauseri vaike-Google-konto — kontrolli, et see on õige (vana vs uus Gmail).</div>
     </div>
     <div class="modal-foot">
       <button class="btn-ghost" data-open-mgr-from-composer>Halda malle</button>
       <span class="spacer"></span>
-      <button class="btn-secondary" id="composer-copy">Kopeeri</button>
-      <button class="btn-secondary" id="composer-log">Loo suhtluslogi kirje</button>
-      <button class="btn-primary" id="composer-mail">Ava e-kiri</button>
+      <button class="btn-secondary" id="composer-copy">Kopeeri kõik</button>
+      <button class="btn-secondary" id="composer-mail">Ava e-kiri (mailto)</button>
+      <button class="btn-primary" id="composer-gmail">Ava Gmailis</button>
     </div>
   </div>
 </div>
@@ -407,6 +419,7 @@ let clientSearch = '';
 let saveTimers = {};
 let messageTemplates = [];         // crm_message_templates (kõik, sh mitteaktiivsed)
 let tmplEditingId = null;          // mallihalduris redigeeritav mall (null = uus)
+let composerLogged = false;        // kas jooksev koostaja-sessioon on juba süsteemi-logi teinud
 
 const KUUD = ['jaanuar','veebruar','märts','aprill','mai','juuni','juuli','august','september','oktoober','november','detsember'];
 
@@ -674,10 +687,16 @@ function renderInteractionsSection(){
   const kindOpts = Object.keys(KIND_LABEL).map(k=>`<option value="${k}">${KIND_ICON[k]} ${KIND_LABEL[k]}</option>`).join('');
   const rows = detail.interactions.map(i=>`
     <div class="timeline-item" data-int="${i.id}">
-      <div class="ti-icon" title="${escapeHtml(KIND_LABEL[i.kind]||i.kind)}">${KIND_ICON[i.kind]||'•'}</div>
+      <div class="ti-icon" title="${escapeHtml(i.source==='system'?'Süsteem koostas':(KIND_LABEL[i.kind]||i.kind))}">${i.source==='system'?'🤖':(KIND_ICON[i.kind]||'•')}</div>
       <div class="ti-body">
-        <div class="ti-summary">${escapeHtml(i.summary)}</div>
-        <div class="ti-meta">${fmtDateTime(i.occurred_at)}${i.created_by?(' · '+escapeHtml(adminName(i.created_by))):''}</div>
+        <div class="ti-summary">${i.source==='system'?'<span class="sys-badge">SÜSTEEM</span>':''}${escapeHtml(i.summary)}</div>
+        <div class="ti-meta">${i.source==='system'?'Süsteem koostas · ':''}${fmtDateTime(i.occurred_at)}${i.source!=='system'&&i.created_by?(' · '+escapeHtml(adminName(i.created_by))):''}${
+          i.source==='system'
+            ? (i.sent_at
+                ? ` · <span class="ti-sent-done">✓ ${escapeHtml(adminName(i.sent_by)||'')} saatis ${fmtDate(i.sent_at)}</span>`
+                : ` · <button class="btn-ghost ti-sent" data-sent="${i.id}">✓ Märgi saadetuks</button>`)
+            : ''
+        }</div>
       </div>
       <button class="btn-danger ti-del" data-del-int="${i.id}">×</button>
     </div>`).join('');
@@ -729,6 +748,7 @@ function bindDetail(){
   // interactions
   panel.querySelector('#add-interaction')?.addEventListener('click', addInteraction);
   panel.querySelectorAll('[data-del-int]').forEach(b=>b.addEventListener('click',()=>deleteInteraction(b.dataset.delInt)));
+  panel.querySelectorAll('[data-sent]').forEach(b=>b.addEventListener('click',()=>markSent(b.dataset.sent)));
 
   // sõnumi koostaja
   panel.querySelector('#open-composer')?.addEventListener('click', openComposer);
@@ -879,6 +899,7 @@ function openComposer(){
   document.getElementById('composer-client').textContent = client.name||'';
   document.getElementById('composer-month').value = prevMonthLabel();
   document.getElementById('composer-docs').value = '';
+  composerLogged = false;
   refreshComposerTemplates();
   updateComposerEmailHint();
   document.getElementById('composer-modal').classList.add('open');
@@ -912,32 +933,61 @@ function updateComposerEmailHint(){
   else { hint.textContent = '⚠ Sellel kliendil pole kontakt-e-posti. Lisa kontaktile e-post, siis saad e-kirja avada (Kopeeri töötab alati).'; hint.style.color='var(--warn)'; }
 }
 function closeComposer(){ document.getElementById('composer-modal').classList.remove('open'); }
-async function composerCopy(){
+async function copyText(text, okMsg){
+  try { await navigator.clipboard.writeText(text||''); showToast(okMsg); }
+  catch(e){ showToast('Kopeerimine ebaõnnestus','error'); }
+}
+function composerCopy(){   // Kopeeri kõik (teema + sisu)
   const subject = document.getElementById('composer-subject').value;
   const body = document.getElementById('composer-body').value;
-  const text = (subject?subject+'\n\n':'')+body;
-  try { await navigator.clipboard.writeText(text); showToast('Kopeeritud'); }
-  catch(e){ showToast('Kopeerimine ebaõnnestus','error'); }
+  copyText((subject?subject+'\n\n':'')+body, 'Kõik kopeeritud');
+}
+function copyField(id, label){ copyText(document.getElementById(id).value, label+' kopeeritud'); }
+
+// Auto-logi süsteemi-kirje esimesel saatmis-tegevusel ("Süsteem koostas")
+async function composerAutoLog(){
+  if(composerLogged || !selectedClientId) return;
+  composerLogged = true;   // sea kohe, et topelt-klõps ei dubleeriks
+  const subject = (document.getElementById('composer-subject').value||'').trim();
+  const email = primaryEmail();
+  const tmpl = messageTemplates.find(x=>x.id===document.getElementById('composer-template').value);
+  const summary = `Sõnum${tmpl?` (${tmpl.name})`:''}${subject?`: "${subject}"`:''}${email?` → ${email}`:''}`;
+  const { data, error } = await sb.from('crm_interactions')
+    .insert({ client_id:selectedClientId, kind:'email', source:'system', summary, occurred_at:new Date().toISOString(), created_by:currentUser.id })
+    .select().single();
+  if(error){ composerLogged=false; console.error('autolog', error); return; }
+  detail.interactions.unshift(data);
+  renderDetail();   // uueneb modaali taga
 }
 function composerMail(){
   const email = primaryEmail();
   const subject = document.getElementById('composer-subject').value;
   const body = document.getElementById('composer-body').value;
-  if(!email){ showToast('Kliendil pole kontakt-e-posti — kasuta Kopeeri','error'); return; }
+  if(!email){ showToast('Kliendil pole kontakt-e-posti — kasuta „Ava Gmailis" või Kopeeri','error'); return; }
+  composerAutoLog();
   window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  showToast('E-kiri avatud — ära unusta logida');
+  showToast('Meiliklient avatud — logisin „Süsteem koostas"');
 }
-async function composerLog(){
-  const subject = (document.getElementById('composer-subject').value||'').trim();
+function composerGmail(){
   const email = primaryEmail();
-  const summary = `Koostas sõnumi${subject?`: "${subject}"`:''}${email?` → ${email}`:''}`;
+  const subject = document.getElementById('composer-subject').value;
+  const body = document.getElementById('composer-body').value;
+  const url = `https://mail.google.com/mail/?view=cm&fs=1&tf=1`
+    + (email?`&to=${encodeURIComponent(email)}`:'')
+    + `&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  composerAutoLog();
+  window.open(url, '_blank');
+  showToast('Gmail avatud — kontrolli õiget kontot');
+}
+// #5 hübriid: inimene kinnitab "Saadetud" → "Süsteem koostas · Eve saatis"
+async function markSent(id){
   const { data, error } = await sb.from('crm_interactions')
-    .insert({ client_id:selectedClientId, kind:'email', summary, occurred_at:new Date().toISOString(), created_by:currentUser.id })
-    .select().single();
+    .update({ sent_at:new Date().toISOString(), sent_by:currentUser.id }).eq('id',id).select().single();
   if(error){ showToast('Viga: '+error.message,'error'); return; }
-  detail.interactions.unshift(data);
+  const it = detail.interactions.find(x=>x.id===id);
+  if(it){ it.sent_at=data.sent_at; it.sent_by=data.sent_by; }
   renderDetail();
-  showToast('Logikirje lisatud');
+  showToast('Märgitud saadetuks');
 }
 
 // ── Mallihaldur ──────────────────────────────────────────────────
@@ -1033,7 +1083,9 @@ function bindUI(){
   document.getElementById('composer-docs').addEventListener('input', refillComposer);
   document.getElementById('composer-copy').addEventListener('click', composerCopy);
   document.getElementById('composer-mail').addEventListener('click', composerMail);
-  document.getElementById('composer-log').addEventListener('click', composerLog);
+  document.getElementById('composer-gmail').addEventListener('click', composerGmail);
+  document.getElementById('copy-subject').addEventListener('click', ()=>copyField('composer-subject','Teema'));
+  document.getElementById('copy-body').addEventListener('click', ()=>copyField('composer-body','Sisu'));
   document.querySelectorAll('[data-close-composer]').forEach(b=>b.addEventListener('click', closeComposer));
   document.querySelectorAll('[data-open-mgr-from-composer]').forEach(b=>b.addEventListener('click', openManager));
 
