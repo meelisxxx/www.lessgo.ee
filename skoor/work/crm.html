@@ -176,6 +176,59 @@
 
     .empty-msg { color:var(--text3); font-size:13px; padding:8px 0; }
 
+    /* toolbar */
+    .crm-toolbar { display:flex; justify-content:flex-end; gap:8px; margin-bottom:14px; }
+
+    /* ── Modal (koostaja + mallihaldur) ── */
+    .modal-overlay {
+      display:none; position:fixed; inset:0; z-index:1100;
+      background:rgba(0,0,0,0.55); backdrop-filter:blur(2px);
+      align-items:flex-start; justify-content:center; padding:32px 16px; overflow-y:auto;
+    }
+    .modal-overlay.open { display:flex; }
+    .modal-card {
+      background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius);
+      width:100%; max-width:640px; box-shadow:0 20px 60px rgba(0,0,0,0.5); margin:auto 0;
+    }
+    .modal-card.wide { max-width:760px; }
+    .modal-head {
+      display:flex; align-items:center; gap:10px; padding:16px 20px; border-bottom:1px solid var(--border);
+    }
+    .modal-title { font-size:15px; font-weight:700; letter-spacing:0.2px; }
+    .modal-close { margin-left:auto; background:transparent; color:var(--text3); font-size:20px; line-height:1; padding:2px 8px; }
+    .modal-close:hover { color:var(--text); }
+    .modal-body { padding:18px 20px; }
+    .modal-foot {
+      display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+      padding:14px 20px; border-top:1px solid var(--border);
+    }
+    .modal-foot .spacer { flex:1; }
+    .field { margin-bottom:14px; }
+    .field label { display:block; margin-bottom:5px; }
+    .field-row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+    .var-chips { display:flex; flex-wrap:wrap; gap:6px; margin:2px 0 4px; }
+    .var-chip {
+      background:var(--bg3); color:var(--text2); border:1px solid var(--border);
+      border-radius:6px; padding:3px 8px; font-size:11px; font-family:inherit;
+    }
+    .var-chip:hover { color:var(--accent); border-color:rgba(16,185,129,0.4); }
+    .field-hint { font-size:11px; color:var(--text3); margin-top:4px; }
+
+    /* mallihalduri nimekiri */
+    .tmpl-row {
+      display:flex; align-items:center; gap:10px; padding:10px 12px;
+      background:var(--bg3); border-radius:8px; margin-bottom:8px;
+    }
+    .tmpl-row .tmpl-name { font-size:13px; font-weight:600; }
+    .tmpl-row .tmpl-cat { font-size:11px; color:var(--text3); }
+    .tmpl-row.inactive { opacity:0.5; }
+    .tmpl-row .tmpl-actions { margin-left:auto; display:flex; gap:6px; align-items:center; }
+
+    @media (max-width:860px) {
+      .field-row2 { grid-template-columns:1fr; }
+    }
+
     /* toast */
     .toast {
       position:fixed; bottom:24px; right:24px; background:var(--bg2);
@@ -216,6 +269,10 @@
       Tähtaja hommikul saadab Skoor meeldetuletuse Slacki #skoor kanalisse ja e-postiga.
     </p>
 
+    <div class="crm-toolbar">
+      <button class="btn-secondary" id="open-templates-mgr">✉️ Sõnumimallid</button>
+    </div>
+
     <div class="upcoming" id="upcoming-panel"></div>
 
     <div class="crm-layout">
@@ -229,6 +286,107 @@
       </section>
     </div>
   </main>
+</div>
+
+<!-- ── Sõnumi koostaja ── -->
+<div class="modal-overlay" id="composer-modal">
+  <div class="modal-card wide">
+    <div class="modal-head">
+      <span>✉️</span>
+      <span class="modal-title">Koosta sõnum — <span id="composer-client"></span></span>
+      <button class="modal-close" data-close-composer>×</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-row2">
+        <div class="field">
+          <label>Mall</label>
+          <select id="composer-template"></select>
+        </div>
+        <div class="field">
+          <label>Kuu <span style="text-transform:none;color:var(--text3)">({kuu})</span></label>
+          <input id="composer-month" placeholder="nt mai 2026">
+        </div>
+      </div>
+      <div class="field" id="composer-docs-field">
+        <label>Puuduvad dokumendid <span style="text-transform:none;color:var(--text3)">({puuduvad_dokumendid}) — kleebi Hermesest</span></label>
+        <textarea id="composer-docs" rows="3" placeholder="nt&#10;- 14.05 · Selver AS · 42.50&#10;- 20.05 · Tele2 · 24.20"></textarea>
+      </div>
+      <div class="field">
+        <label>Teema</label>
+        <input id="composer-subject" placeholder="E-kirja teema">
+      </div>
+      <div class="field">
+        <label>Sisu</label>
+        <textarea id="composer-body" rows="10" placeholder="Vali ülalt mall…"></textarea>
+        <div class="field-hint">Mall täidab {klient}, {kontakt}, {kuu} ja {puuduvad_dokumendid} automaatselt. Muuda teksti vabalt enne saatmist.</div>
+      </div>
+      <div class="field-hint" id="composer-email-hint"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" data-open-mgr-from-composer>Halda malle</button>
+      <span class="spacer"></span>
+      <button class="btn-secondary" id="composer-copy">Kopeeri</button>
+      <button class="btn-secondary" id="composer-log">Loo suhtluslogi kirje</button>
+      <button class="btn-primary" id="composer-mail">Ava e-kiri</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Mallihaldur ── -->
+<div class="modal-overlay" id="mgr-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <span>✉️</span>
+      <span class="modal-title">Sõnumimallid</span>
+      <button class="modal-close" data-close-mgr>×</button>
+    </div>
+    <div class="modal-body" id="mgr-body"></div>
+  </div>
+</div>
+
+<!-- ── Malli redigeerimine ── -->
+<div class="modal-overlay" id="tmpl-edit-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <span>📝</span>
+      <span class="modal-title" id="tmpl-edit-title">Uus mall</span>
+      <button class="modal-close" data-close-tmpl-edit>×</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-row2">
+        <div class="field">
+          <label>Nimi</label>
+          <input id="tmpl-name" placeholder="nt Puuduvate dokumentide meeldetuletus">
+        </div>
+        <div class="field">
+          <label>Kategooria (valikuline)</label>
+          <input id="tmpl-category" placeholder="nt chase / reminder">
+        </div>
+      </div>
+      <div class="field">
+        <label>Teema</label>
+        <input id="tmpl-subject" placeholder="Puuduvad dokumendid – {kuu}">
+      </div>
+      <div class="field">
+        <label>Sisu</label>
+        <div class="var-chips" data-var-target="tmpl-body">
+          <button class="var-chip" data-var="{klient}">{klient}</button>
+          <button class="var-chip" data-var="{kontakt}">{kontakt}</button>
+          <button class="var-chip" data-var="{kuu}">{kuu}</button>
+          <button class="var-chip" data-var="{puuduvad_dokumendid}">{puuduvad_dokumendid}</button>
+        </div>
+        <textarea id="tmpl-body" rows="9" placeholder="Tere {kontakt}, …"></textarea>
+        <div class="field-hint">Klõpsa kohatäidet, et see teksti lisada. Kohatäited täidetakse koostajas automaatselt.</div>
+      </div>
+      <label class="primary-toggle" style="text-transform:none"><input type="checkbox" id="tmpl-active" checked> Aktiivne (nähtav koostajas)</label>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-danger" id="tmpl-delete" style="display:none">Kustuta</button>
+      <span class="spacer"></span>
+      <button class="btn-ghost" data-close-tmpl-edit>Loobu</button>
+      <button class="btn-primary" id="tmpl-save">Salvesta</button>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -247,6 +405,10 @@ let selectedClientId = null;
 let detail = { contacts: [], interactions: [], reminders: [] };
 let clientSearch = '';
 let saveTimers = {};
+let messageTemplates = [];         // crm_message_templates (kõik, sh mitteaktiivsed)
+let tmplEditingId = null;          // mallihalduris redigeeritav mall (null = uus)
+
+const KUUD = ['jaanuar','veebruar','märts','aprill','mai','juuni','juuli','august','september','oktoober','november','detsember'];
 
 const KIND_ICON = { call:'📞', email:'✉️', meeting:'🤝', note:'📝', other:'•' };
 const KIND_LABEL = { call:'Kõne', email:'E-post', meeting:'Kohtumine', note:'Märkus', other:'Muu' };
@@ -277,7 +439,7 @@ async function init(){
     return;
   }
 
-  await Promise.all([loadClients(), loadAdmins(), loadOpenReminders()]);
+  await Promise.all([loadClients(), loadAdmins(), loadOpenReminders(), loadMessageTemplates()]);
 
   document.getElementById('loading-screen').style.display='none';
   document.getElementById('app').style.display='flex';
@@ -399,7 +561,10 @@ function renderDetail(){
   const name = client.name || clientName(selectedClientId);
 
   panel.innerHTML = `
-    <div class="detail-head"><div class="detail-name">${escapeHtml(name)}</div></div>
+    <div class="detail-head">
+      <div class="detail-name">${escapeHtml(name)}</div>
+      <button class="btn-secondary" id="open-composer" style="margin-left:auto">✉️ Koosta sõnum</button>
+    </div>
     ${renderClientInfoSection(client)}
     ${renderContactsSection()}
     ${renderRemindersSection()}
@@ -564,6 +729,9 @@ function bindDetail(){
   // interactions
   panel.querySelector('#add-interaction')?.addEventListener('click', addInteraction);
   panel.querySelectorAll('[data-del-int]').forEach(b=>b.addEventListener('click',()=>deleteInteraction(b.dataset.delInt)));
+
+  // sõnumi koostaja
+  panel.querySelector('#open-composer')?.addEventListener('click', openComposer);
 }
 
 // ── Kliendi andmed salvestus ─────────────────────────────────────
@@ -681,10 +849,211 @@ async function deleteInteraction(id){
   renderDetail(); showToast('Kustutatud');
 }
 
+// ══ Sõnumimallid (UKU #4) ═════════════════════════════════════════
+async function loadMessageTemplates(){
+  const { data, error } = await sb.from('crm_message_templates')
+    .select('*').order('sort_order').order('name');
+  if(error){ console.error('message templates', error); return; }
+  messageTemplates = data||[];
+}
+
+// ── Kohatäidete täitmine ─────────────────────────────────────────
+function fillTemplate(str, vars){
+  return String(str||'').replace(/\{(klient|kontakt|kuu|puuduvad_dokumendid)\}/g,
+    (m,k)=> (vars[k] !== undefined && vars[k] !== null) ? vars[k] : m);
+}
+function prevMonthLabel(){
+  const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-1);
+  return `${KUUD[d.getMonth()]} ${d.getFullYear()}`;
+}
+function primaryContact(){ return detail.contacts.find(c=>c.is_primary) || detail.contacts[0] || null; }
+function primaryEmail(){
+  const c = detail.contacts.find(c=>c.is_primary && c.email) || detail.contacts.find(c=>c.email);
+  return c ? (c.email||'').trim() : '';
+}
+
+// ── Koostaja ─────────────────────────────────────────────────────
+function openComposer(){
+  if(!selectedClientId){ showToast('Vali esmalt klient','error'); return; }
+  const client = clients.find(c=>c.id===selectedClientId)||{};
+  document.getElementById('composer-client').textContent = client.name||'';
+  document.getElementById('composer-month').value = prevMonthLabel();
+  document.getElementById('composer-docs').value = '';
+  refreshComposerTemplates();
+  updateComposerEmailHint();
+  document.getElementById('composer-modal').classList.add('open');
+}
+function refreshComposerTemplates(){
+  const sel = document.getElementById('composer-template');
+  const prev = sel.value;
+  const active = messageTemplates.filter(t=>t.is_active);
+  sel.innerHTML = active.length
+    ? active.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('')
+    : `<option value="">— malle pole (loo mallihalduris) —</option>`;
+  if(active.find(t=>t.id===prev)) sel.value = prev;
+  refillComposer();
+}
+function refillComposer(){
+  const t = messageTemplates.find(x=>x.id===document.getElementById('composer-template').value);
+  const client = clients.find(c=>c.id===selectedClientId)||{};
+  const vars = {
+    klient: client.name||'',
+    kontakt: (primaryContact()?.name)||'',
+    kuu: document.getElementById('composer-month').value||'',
+    puuduvad_dokumendid: document.getElementById('composer-docs').value||'',
+  };
+  document.getElementById('composer-subject').value = t ? fillTemplate(t.subject, vars) : '';
+  document.getElementById('composer-body').value    = t ? fillTemplate(t.body, vars) : '';
+}
+function updateComposerEmailHint(){
+  const email = primaryEmail();
+  const hint = document.getElementById('composer-email-hint');
+  if(email){ hint.textContent = `E-kiri avaneb aadressile: ${email}`; hint.style.color='var(--text3)'; }
+  else { hint.textContent = '⚠ Sellel kliendil pole kontakt-e-posti. Lisa kontaktile e-post, siis saad e-kirja avada (Kopeeri töötab alati).'; hint.style.color='var(--warn)'; }
+}
+function closeComposer(){ document.getElementById('composer-modal').classList.remove('open'); }
+async function composerCopy(){
+  const subject = document.getElementById('composer-subject').value;
+  const body = document.getElementById('composer-body').value;
+  const text = (subject?subject+'\n\n':'')+body;
+  try { await navigator.clipboard.writeText(text); showToast('Kopeeritud'); }
+  catch(e){ showToast('Kopeerimine ebaõnnestus','error'); }
+}
+function composerMail(){
+  const email = primaryEmail();
+  const subject = document.getElementById('composer-subject').value;
+  const body = document.getElementById('composer-body').value;
+  if(!email){ showToast('Kliendil pole kontakt-e-posti — kasuta Kopeeri','error'); return; }
+  window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  showToast('E-kiri avatud — ära unusta logida');
+}
+async function composerLog(){
+  const subject = (document.getElementById('composer-subject').value||'').trim();
+  const email = primaryEmail();
+  const summary = `Koostas sõnumi${subject?`: "${subject}"`:''}${email?` → ${email}`:''}`;
+  const { data, error } = await sb.from('crm_interactions')
+    .insert({ client_id:selectedClientId, kind:'email', summary, occurred_at:new Date().toISOString(), created_by:currentUser.id })
+    .select().single();
+  if(error){ showToast('Viga: '+error.message,'error'); return; }
+  detail.interactions.unshift(data);
+  renderDetail();
+  showToast('Logikirje lisatud');
+}
+
+// ── Mallihaldur ──────────────────────────────────────────────────
+function openManager(){ renderManager(); document.getElementById('mgr-modal').classList.add('open'); }
+function closeManager(){
+  document.getElementById('mgr-modal').classList.remove('open');
+  if(document.getElementById('composer-modal').classList.contains('open')) refreshComposerTemplates();
+}
+function renderManager(){
+  const body = document.getElementById('mgr-body');
+  const rows = messageTemplates.map(t=>`
+    <div class="tmpl-row ${t.is_active?'':'inactive'}">
+      <div>
+        <div class="tmpl-name">${escapeHtml(t.name)}</div>
+        <div class="tmpl-cat">${escapeHtml(t.category||'')}${t.is_active?'':' · mitteaktiivne'}</div>
+      </div>
+      <div class="tmpl-actions">
+        <button class="btn-ghost" data-edit-tmpl="${t.id}">Muuda</button>
+      </div>
+    </div>`).join('');
+  body.innerHTML = `
+    ${rows || '<div class="empty-msg">Malle pole veel. Loo esimene.</div>'}
+    <button class="btn-primary" id="tmpl-new" style="margin-top:12px">+ Uus mall</button>`;
+  body.querySelector('#tmpl-new').addEventListener('click', ()=>openTmplEdit(null));
+  body.querySelectorAll('[data-edit-tmpl]').forEach(b=>b.addEventListener('click',()=>openTmplEdit(b.dataset.editTmpl)));
+}
+function openTmplEdit(id){
+  tmplEditingId = id;
+  const t = id ? messageTemplates.find(x=>x.id===id) : null;
+  document.getElementById('tmpl-edit-title').textContent = t ? 'Muuda malli' : 'Uus mall';
+  document.getElementById('tmpl-name').value = t?.name||'';
+  document.getElementById('tmpl-category').value = t?.category||'';
+  document.getElementById('tmpl-subject').value = t?.subject||'';
+  document.getElementById('tmpl-body').value = t?.body||'';
+  document.getElementById('tmpl-active').checked = t ? !!t.is_active : true;
+  document.getElementById('tmpl-delete').style.display = t ? '' : 'none';
+  document.getElementById('tmpl-edit-modal').classList.add('open');
+}
+function closeTmplEdit(){ document.getElementById('tmpl-edit-modal').classList.remove('open'); tmplEditingId=null; }
+async function saveTmpl(){
+  const name = document.getElementById('tmpl-name').value.trim();
+  const category = document.getElementById('tmpl-category').value.trim()||null;
+  const subject = document.getElementById('tmpl-subject').value.trim()||null;
+  const body = document.getElementById('tmpl-body').value.trim();
+  const is_active = document.getElementById('tmpl-active').checked;
+  if(!name){ showToast('Sisesta malli nimi','error'); return; }
+  if(!body){ showToast('Sisesta malli sisu','error'); return; }
+  if(tmplEditingId){
+    const { data, error } = await sb.from('crm_message_templates')
+      .update({ name, category, subject, body, is_active, updated_at:new Date().toISOString() })
+      .eq('id',tmplEditingId).select().single();
+    if(error){ showToast('Viga: '+error.message,'error'); return; }
+    const i = messageTemplates.findIndex(x=>x.id===tmplEditingId);
+    if(i>=0) messageTemplates[i]=data;
+  } else {
+    const { data, error } = await sb.from('crm_message_templates')
+      .insert({ name, category, subject, body, is_active, created_by:currentUser.id })
+      .select().single();
+    if(error){ showToast('Viga: '+error.message,'error'); return; }
+    messageTemplates.push(data);
+  }
+  closeTmplEdit(); renderManager(); showToast('Mall salvestatud');
+}
+async function deleteTmpl(){
+  if(!tmplEditingId) return;
+  if(!confirm('Kustuta see mall?')) return;
+  const { error } = await sb.from('crm_message_templates').delete().eq('id',tmplEditingId);
+  if(error){ showToast('Viga: '+error.message,'error'); return; }
+  messageTemplates = messageTemplates.filter(x=>x.id!==tmplEditingId);
+  closeTmplEdit(); renderManager(); showToast('Mall kustutatud');
+}
+function insertVar(targetId, token){
+  const el = document.getElementById(targetId);
+  if(!el) return;
+  const s = el.selectionStart ?? el.value.length;
+  const e = el.selectionEnd ?? el.value.length;
+  el.value = el.value.slice(0,s) + token + el.value.slice(e);
+  const pos = s + token.length;
+  el.focus(); el.setSelectionRange(pos,pos);
+}
+
 // ── UI ───────────────────────────────────────────────────────────
 function bindUI(){
   document.getElementById('logout-btn').addEventListener('click', ()=>sb.auth.signOut());
   document.getElementById('client-search').addEventListener('input',(e)=>{ clientSearch=e.target.value; renderClientList(); });
+
+  // sõnumimallide sissepääs
+  document.getElementById('open-templates-mgr').addEventListener('click', openManager);
+
+  // koostaja
+  document.getElementById('composer-template').addEventListener('change', refillComposer);
+  document.getElementById('composer-month').addEventListener('input', refillComposer);
+  document.getElementById('composer-docs').addEventListener('input', refillComposer);
+  document.getElementById('composer-copy').addEventListener('click', composerCopy);
+  document.getElementById('composer-mail').addEventListener('click', composerMail);
+  document.getElementById('composer-log').addEventListener('click', composerLog);
+  document.querySelectorAll('[data-close-composer]').forEach(b=>b.addEventListener('click', closeComposer));
+  document.querySelectorAll('[data-open-mgr-from-composer]').forEach(b=>b.addEventListener('click', openManager));
+
+  // mallihaldur + redigeerimine
+  document.querySelectorAll('[data-close-mgr]').forEach(b=>b.addEventListener('click', closeManager));
+  document.getElementById('tmpl-save').addEventListener('click', saveTmpl);
+  document.getElementById('tmpl-delete').addEventListener('click', deleteTmpl);
+  document.querySelectorAll('[data-close-tmpl-edit]').forEach(b=>b.addEventListener('click', closeTmplEdit));
+
+  // muutuja-kiibid → lisa tekstiväljale
+  document.querySelectorAll('.var-chips').forEach(group=>{
+    const target = group.dataset.varTarget;
+    group.querySelectorAll('[data-var]').forEach(b=>b.addEventListener('click', ()=>insertVar(target, b.dataset.var)));
+  });
+
+  // klõps overlay taustale sulgeb
+  [['composer-modal',closeComposer],['mgr-modal',closeManager],['tmpl-edit-modal',closeTmplEdit]].forEach(([id,fn])=>{
+    const ov = document.getElementById(id);
+    ov.addEventListener('click', (e)=>{ if(e.target===ov) fn(); });
+  });
 }
 
 init();
