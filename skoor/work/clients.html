@@ -183,6 +183,13 @@
       font-variant-numeric: tabular-nums;
     }
     .client-rate.missing { color: var(--warn); }
+    .client-card-header .client-name { margin-right: auto; }
+    .billing-freq {
+      font-size: 12px; padding: 3px 7px; border-radius: 6px;
+      background: var(--bg3); border: 1px solid var(--border); color: var(--text2);
+      font-family: inherit; cursor: pointer; outline: none;
+    }
+    .billing-freq:focus { border-color: var(--accent); }
 
     .templates-list {
       display: flex;
@@ -561,7 +568,7 @@ async function init() {
 
 async function loadClients() {
   const { data, error } = await sb.from('clients')
-    .select('id, name, notes, merit_evemee_customer_id, merit_evemee_reg_no, merit_evemee_country_code')
+    .select('id, name, notes, billing_frequency, merit_evemee_customer_id, merit_evemee_reg_no, merit_evemee_country_code')
     .order('name');
   if (error) { console.error('clients:', error); return; }
   clients = data || [];
@@ -666,6 +673,18 @@ function render() {
   grid.querySelectorAll('[data-merit-field]').forEach(el => {
     el.addEventListener('input', () => debounceSaveMerit(el.dataset.client, el.dataset.meritField, el.value));
   });
+  grid.querySelectorAll('[data-billing-freq]').forEach(el => {
+    el.addEventListener('change', () => saveBillingFreq(el.dataset.client, el.value));
+  });
+}
+
+async function saveBillingFreq(clientId, value) {
+  if (!['monthly','manual'].includes(value)) return;
+  const { error } = await sb.from('clients').update({ billing_frequency: value }).eq('id', clientId);
+  if (error) { showToast('Viga: ' + error.message, 'error'); return; }
+  const c = clients.find(c => c.id === clientId);
+  if (c) c.billing_frequency = value;
+  showToast(value === 'manual' ? 'Käsitsi arveldatav — väljas igakuisest loendist' : 'Igakuine arveldus');
 }
 
 function debounceSaveClientNotes(clientId, value) {
@@ -748,6 +767,10 @@ function renderClientCard(client) {
       <div class="client-card-header">
         <div class="client-name">${escapeHtml(client.name)}</div>
         ${rateHtml}
+        <select class="billing-freq" data-billing-freq data-client="${client.id}" title="Arve-sagedus">
+          <option value="monthly" ${(client.billing_frequency || 'monthly') === 'monthly' ? 'selected' : ''}>📅 Kuu</option>
+          <option value="manual"  ${client.billing_frequency === 'manual' ? 'selected' : ''}>✋ Käsitsi</option>
+        </select>
       </div>
       ${renderNotesSection(client)}
       <div class="templates-list">

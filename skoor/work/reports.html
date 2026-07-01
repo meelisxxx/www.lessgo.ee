@@ -259,6 +259,13 @@
       border-radius: var(--radius);
     }
 
+    /* Käsitsi arveldatavad sektsioon (Faas 14) */
+    .manual-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; cursor: pointer; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; }
+    .manual-head:hover { border-color: var(--text3); }
+    .manual-title { font-size: 14px; font-weight: 700; }
+    .manual-count { font-size: 12px; color: var(--text3); }
+    .manual-caret { margin-left: auto; font-size: 12px; color: var(--text2); background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; }
+
     /* Kasumlikkus (#6) */
     .profit-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 22px; }
     .profit-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
@@ -372,6 +379,8 @@
     </div>
 
     <div class="invoices-grid" id="invoices-grid"></div>
+
+    <div id="manual-section" style="margin-top:22px"></div>
   </main>
 </div>
 
@@ -425,6 +434,7 @@ let invoicesByClient = {};       // client_id → monthly_invoice row
 let currentPeriod = lastPeriod();
 let targetRate = 40;             // sihttunnihind (#6 kasumlikkus), muudetav UI-s
 let profitOpen = false;          // kas kasumlikkuse paneel on lahti
+let manualOpen = false;          // kas "käsitsi arveldatavad" sektsioon on lahti
 
 // ── Helpers ─────────────────────────────────────────────────────
 function todayPeriod() {
@@ -549,7 +559,7 @@ async function init() {
 
 async function loadClients() {
   const { data, error } = await sb.from('clients')
-    .select('id, name, slug, merit_evemee_customer_id, merit_evemee_reg_no, merit_evemee_country_code')
+    .select('id, name, slug, billing_frequency, merit_evemee_customer_id, merit_evemee_reg_no, merit_evemee_country_code')
     .order('name');
   if (error) { showToast('Kliente ei saanud laadida: ' + error.message, 'error'); return; }
   clients = data || [];
@@ -596,27 +606,50 @@ async function refresh() {
 // ── Render ──────────────────────────────────────────────────────
 function render() {
   const grid = document.getElementById('invoices-grid');
+  const manualWrap = document.getElementById('manual-section');
   if (clients.length === 0) {
     grid.innerHTML = '<div class="empty-msg">Kliente pole.</div>';
+    if (manualWrap) manualWrap.innerHTML = '';
     return;
   }
 
-  grid.innerHTML = clients.map(renderInvoiceCard).join('');
+  const monthly = clients.filter(c => (c.billing_frequency || 'monthly') !== 'manual');
+  const manual  = clients.filter(c => c.billing_frequency === 'manual');
 
-  grid.querySelectorAll('[data-action="lock"]').forEach(b =>
-    b.addEventListener('click', () => onLock(b.dataset.client))
-  );
-  grid.querySelectorAll('[data-action="unlock"]').forEach(b =>
-    b.addEventListener('click', () => onUnlock(b.dataset.client))
-  );
-  grid.querySelectorAll('[data-action="send"]').forEach(b =>
-    b.addEventListener('click', () => onSend(b.dataset.client))
-  );
-  grid.querySelectorAll('[data-action="skip"]').forEach(b =>
-    b.addEventListener('click', () => onSkip(b.dataset.client))
-  );
+  grid.innerHTML = monthly.map(renderInvoiceCard).join('') || '<div class="empty-msg">Igakuiseid kliente pole.</div>';
+  renderManualSection(manual);
+
+  // Sea toimingud mõlemas konteineris (kuu + käsitsi)
+  document.querySelectorAll('[data-action="lock"]').forEach(b =>
+    b.addEventListener('click', () => onLock(b.dataset.client)));
+  document.querySelectorAll('[data-action="unlock"]').forEach(b =>
+    b.addEventListener('click', () => onUnlock(b.dataset.client)));
+  document.querySelectorAll('[data-action="send"]').forEach(b =>
+    b.addEventListener('click', () => onSend(b.dataset.client)));
+  document.querySelectorAll('[data-action="skip"]').forEach(b =>
+    b.addEventListener('click', () => onSkip(b.dataset.client)));
 
   renderProfitability();
+}
+
+// Käsitsi arveldatavad (kvartal/aasta/ebaregulaarne) — eraldi kokkupandav sektsioon
+function renderManualSection(manual) {
+  const wrap = document.getElementById('manual-section');
+  if (!wrap) return;
+  if (manual.length === 0) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `
+    <div class="manual-head" id="manual-toggle">
+      <span class="manual-title">✋ Käsitsi arveldatavad</span>
+      <span class="manual-count">${manual.length} klienti — kvartal / aasta / ebaregulaarne, väljas igakuisest loendist</span>
+      <span class="manual-caret">${manualOpen ? 'Peida ▴' : 'Näita ▾'}</span>
+    </div>
+    <div class="invoices-grid" id="manual-grid" style="display:${manualOpen ? 'grid' : 'none'}; margin-top:14px">
+      ${manualOpen ? manual.map(renderInvoiceCard).join('') : ''}
+    </div>`;
+  document.getElementById('manual-toggle').addEventListener('click', () => {
+    manualOpen = !manualOpen;
+    render();
+  });
 }
 
 // ── Kasumlikkus (#6): efektiivne €/h = arve ÷ töötunnid ──────────
@@ -630,7 +663,7 @@ function renderProfitability() {
 
   // read per klient: tunnid + arve (lukustatud snapshot VÕI arvutatud)
   const rows = [];
-  clients.forEach(c => {
+  clients.filter(c => (c.billing_frequency || 'monthly') !== 'manual').forEach(c => {
     const calc = calcOpen(c.id);
     const hours = (calc.total_minutes || 0) / 60;
     if (hours <= 0) return;                       // ilma tööta → €/h määramata
