@@ -36,8 +36,11 @@
     '<circle cx="50" cy="72" r="7" fill="#10b981"/></svg>';
 
   // ── Aktiivse lehe tuvastus location.pathname järgi ──────────────────────
+  // CF Pages serveerib laiendita URL-e (/skoor/work/reports), seega võrdle
+  // ilma .html-ita — muidu 'reports' !== 'reports.html' ja kast jääb tulemata.
   let current = location.pathname.substring(location.pathname.lastIndexOf('/') + 1);
-  if (!current || current === '') current = 'index.html';
+  current = current.replace(/\.html$/, '');
+  if (!current) current = 'index';
 
   // ── Stiil (Apple-tokenid: 8px-rütm, raadius-skaala, scale()-vajutus,
   //    hairline-äärised; Skoori roheline aktsent + tume/hele teema säilib) ──
@@ -139,7 +142,7 @@
 
   // ── Markup ──────────────────────────────────────────────────────────────
   const navLinks = LINKS.map(l => {
-    const active = (l.file === current) ? ' active' : '';
+    const active = (l.file.replace(/\.html$/, '') === current) ? ' active' : '';
     return `<a href="${l.file}" class="sk-link${active}">${l.label}</a>`;
   }).join('');
 
