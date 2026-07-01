@@ -190,6 +190,17 @@
       font-family: inherit; cursor: pointer; outline: none;
     }
     .billing-freq:focus { border-color: var(--accent); }
+    .rate-section {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin-bottom: 14px; padding: 10px 12px; background: var(--bg3); border-radius: 8px;
+    }
+    .rate-label { font-size: 12px; color: var(--text2); font-weight: 600; }
+    .rate-section select, .rate-section input {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); font-family: inherit; font-size: 13px; padding: 6px 8px; outline: none;
+    }
+    .rate-section select:focus, .rate-section input:focus { border-color: var(--accent); }
+    .rate-status { font-size: 12px; color: var(--text3); margin-left: auto; }
 
     .templates-list {
       display: flex;
@@ -676,6 +687,12 @@ function render() {
   grid.querySelectorAll('[data-billing-freq]').forEach(el => {
     el.addEventListener('change', () => saveBillingFreq(el.dataset.client, el.value));
   });
+  grid.querySelectorAll('[data-rate-type]').forEach(el => {
+    el.addEventListener('change', () => saveRate(el.dataset.client));
+  });
+  grid.querySelectorAll('[data-rate-amount]').forEach(el => {
+    el.addEventListener('input', () => debounceSaveRate(el.dataset.client));
+  });
 }
 
 async function saveBillingFreq(clientId, value) {
@@ -748,17 +765,54 @@ async function saveMeritField(clientId, field, rawValue) {
   showToast('Salvestatud');
 }
 
-function renderClientCard(client) {
+// ── Hind (tunni-/fikshind) kliendikaardil ────────────────────────
+function renderRateSection(client) {
   const rate = rates[client.id];
-  let rateHtml;
-  if (!rate) {
-    rateHtml = '<span class="client-rate missing">hind puudub</span>';
-  } else if (rate.is_fixed_price) {
-    rateHtml = `<span class="client-rate">fix: ${fmtEur(rate.fixed_price_eur)}</span>`;
-  } else {
-    rateHtml = `<span class="client-rate">${fmtEur(rate.rate_eur)}/h</span>`;
-  }
+  const isFixed = !!(rate && rate.is_fixed_price);
+  const amount = rate ? (isFixed ? rate.fixed_price_eur : rate.rate_eur) : null;
+  const amountVal = (amount === null || amount === undefined) ? '' : amount;
+  return `
+    <div class="rate-section">
+      <span class="rate-label">💶 Hind</span>
+      <select data-rate-type data-client="${client.id}">
+        <option value="hourly" ${isFixed ? '' : 'selected'}>Tunnihind (€/h)</option>
+        <option value="fixed"  ${isFixed ? 'selected' : ''}>Fikshind (€/kuu)</option>
+      </select>
+      <input type="number" data-rate-amount data-client="${client.id}" value="${amountVal}"
+             step="0.01" min="0" placeholder="0.00" style="width:110px">
+      <span class="rate-status" data-rate-status="${client.id}">${rate ? '' : '<span style="color:var(--warn)">määramata</span>'}</span>
+    </div>`;
+}
+function debounceSaveRate(clientId) {
+  const key = `rate|${clientId}`;
+  clearTimeout(saveTimers[key]);
+  const st = document.querySelector(`[data-rate-status="${clientId}"]`); if (st) st.textContent = '…';
+  saveTimers[key] = setTimeout(() => saveRate(clientId), 600);
+}
+async function saveRate(clientId) {
+  const typeEl = document.querySelector(`[data-rate-type][data-client="${clientId}"]`);
+  const amtEl  = document.querySelector(`[data-rate-amount][data-client="${clientId}"]`);
+  const st     = document.querySelector(`[data-rate-status="${clientId}"]`);
+  if (!typeEl || !amtEl) return;
+  const isFixed = typeEl.value === 'fixed';
+  const amount = parseFloat(amtEl.value);
+  if (isNaN(amount) || amount < 0) { if (st) st.textContent = ''; return; }   // tühi → ära salvesta
+  const patch = {
+    client_id: clientId,
+    is_fixed_price: isFixed,
+    rate_eur:        isFixed ? null : amount,
+    fixed_price_eur: isFixed ? amount : null,
+    notes: rates[clientId]?.notes ?? null,
+    updated_by: currentUser.id,
+    updated_at: new Date().toISOString()
+  };
+  const { error } = await sb.from('hourly_rates').upsert(patch, { onConflict: 'client_id' });
+  if (error) { showToast('Viga: ' + error.message, 'error'); if (st) st.textContent = ''; return; }
+  rates[clientId] = { ...(rates[clientId] || {}), ...patch };
+  if (st) { st.textContent = '✓ salvestatud'; setTimeout(() => { if (st.textContent === '✓ salvestatud') st.textContent = ''; }, 1600); }
+}
 
+function renderClientCard(client) {
   // Erimallid (is_special) ei kuvata kliendikaardil — neid määratakse Mallid-lehe kliendivalijaga
   const rows = templates.filter(tpl => !tpl.is_special).map(tpl => renderTemplateRow(client.id, tpl)).join('');
 
@@ -766,12 +820,12 @@ function renderClientCard(client) {
     <div class="client-card">
       <div class="client-card-header">
         <div class="client-name">${escapeHtml(client.name)}</div>
-        ${rateHtml}
         <select class="billing-freq" data-billing-freq data-client="${client.id}" title="Arve-sagedus">
           <option value="monthly" ${(client.billing_frequency || 'monthly') === 'monthly' ? 'selected' : ''}>📅 Kuu</option>
           <option value="manual"  ${client.billing_frequency === 'manual' ? 'selected' : ''}>✋ Käsitsi</option>
         </select>
       </div>
+      ${renderRateSection(client)}
       ${renderNotesSection(client)}
       <div class="templates-list">
         ${rows || '<div class="empty-msg">Mallid puuduvad.</div>'}
