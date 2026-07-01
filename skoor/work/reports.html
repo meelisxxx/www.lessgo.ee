@@ -259,6 +259,27 @@
       border-radius: var(--radius);
     }
 
+    /* Kasumlikkus (#6) */
+    .profit-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 22px; }
+    .profit-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .profit-title { font-size: 14px; font-weight: 700; }
+    .profit-target { font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 6px; margin-left: auto; }
+    .profit-target input { width: 64px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit; font-size: 13px; padding: 5px 7px; text-align: right; }
+    #profit-body { margin-top: 14px; overflow-x: auto; }
+    .profit-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 620px; }
+    .profit-table th { text-align: right; color: var(--text3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 0 10px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .profit-table th.l, .profit-table td.l { text-align: left; }
+    .profit-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .profit-table tr:last-child td { border-bottom: none; }
+    .profit-table tr.foot td { border-top: 2px solid var(--border); border-bottom: none; font-weight: 700; padding-top: 11px; }
+    .profit-table .cname { font-weight: 500; }
+    .ptype { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; padding: 1px 6px; border-radius: 4px; margin-left: 7px; }
+    .ptype.fix { background: rgba(129,140,248,0.15); color: var(--info); }
+    .ptype.hr  { background: rgba(107,114,128,0.18); color: var(--text2); }
+    .pgood { color: var(--pos); font-weight: 600; }
+    .pbad  { color: var(--neg); font-weight: 600; }
+    .pmuted { color: var(--text3); }
+
     /* Toast */
     .toast {
       position: fixed;
@@ -339,6 +360,17 @@
       <button class="btn-secondary" id="prev-month-btn">Eelmine kuu</button>
     </div>
 
+    <div class="profit-panel">
+      <div class="profit-head">
+        <span class="profit-title">💰 Kliendi kasumlikkus <span style="color:var(--text3);font-weight:400">(selle kuu töö)</span></span>
+        <label class="profit-target">Sihttunnihind
+          <input type="number" id="target-rate" value="40" min="0" step="5"> €/h
+        </label>
+        <button class="btn-secondary" id="profit-toggle">Näita ▾</button>
+      </div>
+      <div id="profit-body" style="display:none"></div>
+    </div>
+
     <div class="invoices-grid" id="invoices-grid"></div>
   </main>
 </div>
@@ -391,6 +423,8 @@ let rates = {};                  // client_id → rate row
 let entriesByClient = {};        // client_id → { tracked_minutes, adj_minutes }
 let invoicesByClient = {};       // client_id → monthly_invoice row
 let currentPeriod = lastPeriod();
+let targetRate = 40;             // sihttunnihind (#6 kasumlikkus), muudetav UI-s
+let profitOpen = false;          // kas kasumlikkuse paneel on lahti
 
 // ── Helpers ─────────────────────────────────────────────────────
 function todayPeriod() {
@@ -581,6 +615,92 @@ function render() {
   grid.querySelectorAll('[data-action="skip"]').forEach(b =>
     b.addEventListener('click', () => onSkip(b.dataset.client))
   );
+
+  renderProfitability();
+}
+
+// ── Kasumlikkus (#6): efektiivne €/h = arve ÷ töötunnid ──────────
+function renderProfitability() {
+  const body = document.getElementById('profit-body');
+  const toggle = document.getElementById('profit-toggle');
+  if (toggle) toggle.textContent = profitOpen ? 'Peida ▴' : 'Näita ▾';
+  if (!body) return;
+  body.style.display = profitOpen ? 'block' : 'none';
+  if (!profitOpen) return;
+
+  // read per klient: tunnid + arve (lukustatud snapshot VÕI arvutatud)
+  const rows = [];
+  clients.forEach(c => {
+    const calc = calcOpen(c.id);
+    const hours = (calc.total_minutes || 0) / 60;
+    if (hours <= 0) return;                       // ilma tööta → €/h määramata
+    const inv = invoicesByClient[c.id];
+    const r = rates[c.id];
+    const revenue = inv ? Number(inv.total_eur) : (calc.missing_rate ? null : calc.total_eur);
+    const eff = (revenue != null && hours > 0) ? revenue / hours : null;
+    const margin = (revenue != null) ? revenue - hours * targetRate : null;
+    rows.push({ name: c.name, hours, revenue, eff, margin, isFixed: !!(r && r.is_fixed_price), missing: calc.missing_rate });
+  });
+
+  if (rows.length === 0) {
+    body.innerHTML = '<div class="empty-msg" style="padding:24px">Sel kuul pole ühelgi kliendil logitud töötunde.</div>';
+    return;
+  }
+
+  // sorteeri: efektiivne €/h kasvavalt (alahinnatuimad üleval); määramata lõppu
+  rows.sort((a, b) => {
+    if (a.eff == null && b.eff == null) return 0;
+    if (a.eff == null) return 1;
+    if (b.eff == null) return -1;
+    return a.eff - b.eff;
+  });
+
+  const totHours = rows.reduce((s, r) => s + r.hours, 0);
+  const totRev = rows.reduce((s, r) => s + (r.revenue || 0), 0);
+  const totMargin = rows.reduce((s, r) => s + (r.margin || 0), 0);
+  const blended = totHours > 0 ? totRev / totHours : null;
+
+  const effCell = (r) => {
+    if (r.missing || r.eff == null) return '<span class="pmuted">hind puudub</span>';
+    const cls = r.eff < targetRate ? 'pbad' : 'pgood';
+    return `<span class="${cls}">${fmtEur(r.eff)}/h</span>`;
+  };
+  const marginCell = (v) => {
+    if (v == null) return '<span class="pmuted">—</span>';
+    const cls = v < 0 ? 'pbad' : 'pgood';
+    return `<span class="${cls}">${v >= 0 ? '+' : ''}${fmtEur(v)}</span>`;
+  };
+
+  body.innerHTML = `
+    <table class="profit-table">
+      <thead><tr>
+        <th class="l">Klient</th>
+        <th>Töötunnid</th>
+        <th>Arve</th>
+        <th>Efektiivne €/h</th>
+        <th>Marginaal (vs ${targetRate}€/h)</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r => `
+          <tr>
+            <td class="l cname">${escapeHtml(r.name)}<span class="ptype ${r.isFixed ? 'fix' : 'hr'}">${r.isFixed ? 'fiks' : 'tunni'}</span></td>
+            <td>${fmtHM(Math.round(r.hours * 60))}</td>
+            <td>${r.revenue == null ? '<span class="pmuted">—</span>' : fmtEur(r.revenue)}</td>
+            <td>${effCell(r)}</td>
+            <td>${marginCell(r.margin)}</td>
+          </tr>`).join('')}
+        <tr class="foot">
+          <td class="l">Kokku (${rows.length})</td>
+          <td>${fmtHM(Math.round(totHours * 60))}</td>
+          <td>${fmtEur(totRev)}</td>
+          <td>${blended == null ? '—' : `<span class="${blended < targetRate ? 'pbad' : 'pgood'}">${fmtEur(blended)}/h</span>`}</td>
+          <td>${marginCell(totMargin)}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="font-size:11px;color:var(--text3);margin-top:10px">
+      Efektiivne €/h = arve ÷ töötunnid. Punane = alla sihttunnihinna (alahinnatud klient — kaalu hinnatõusu). Fikshinna-kliendid on kõige kõnekamad. Arve = lukustatud kuu snapshot, muidu arvutatud ootus.
+    </div>`;
 }
 
 function renderInvoiceCard(client) {
@@ -885,6 +1005,17 @@ function bindUIEvents() {
     currentPeriod = lastPeriod();
     document.getElementById('period-input').value = currentPeriod;
     await refresh();
+  });
+
+  // Kasumlikkus (#6)
+  document.getElementById('profit-toggle').addEventListener('click', () => {
+    profitOpen = !profitOpen;
+    renderProfitability();
+  });
+  document.getElementById('target-rate').addEventListener('input', (e) => {
+    const v = parseFloat(e.target.value);
+    targetRate = (isNaN(v) || v < 0) ? 0 : v;
+    if (profitOpen) renderProfitability();
   });
 }
 
