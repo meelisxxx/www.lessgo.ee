@@ -431,6 +431,34 @@
       transition: border-color 0.2s;
     }
     .merit-section input[type="text"]:focus { border-color: var(--accent); }
+
+    /* ── Püsiread (litsentsitasud) ── */
+    .rec-section { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .rec-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .rec-title { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; }
+    .rec-hint { font-size: 11px; color: var(--text3); margin-left: auto; }
+    .rec-empty { font-size: 12px; color: var(--text3); margin-bottom: 6px; }
+    .rec-line { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+    .rec-line input[type="text"], .rec-line input[type="number"], .rec-line select {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); font-family: inherit; font-size: 12px; padding: 6px 8px; outline: none;
+    }
+    .rec-line input:focus, .rec-line select:focus { border-color: var(--accent); }
+    .rec-line .rec-label-in { flex: 1 1 auto; min-width: 0; }
+    .rec-line .rec-price-in { width: 82px; text-align: right; font-variant-numeric: tabular-nums; }
+    .rec-line .rec-vat-in { width: 64px; }
+    .rec-line.inactive .rec-label-in, .rec-line.inactive .rec-price-in, .rec-line.inactive .rec-vat-in { opacity: 0.45; }
+    .rec-del {
+      background: transparent; border: none; color: var(--text3); cursor: pointer;
+      font-size: 14px; line-height: 1; padding: 5px 7px; border-radius: 6px;
+    }
+    .rec-del:hover { color: var(--neg); background: rgba(239,68,68,0.10); }
+    .rec-add { margin-top: 6px; }
+    .rec-add select {
+      background: var(--bg2); border: 1px dashed var(--border); border-radius: 6px;
+      color: var(--text2); font-family: inherit; font-size: 12px; padding: 6px 10px; outline: none; cursor: pointer;
+    }
+    .rec-add select:focus { border-color: var(--accent); }
     .merit-section .field-label {
       font-size: 10px;
       color: var(--text3);
@@ -512,6 +540,7 @@ let isAdmin = false;
 let clients = [];
 let templates = [];
 let rates = {};                       // client_id → rate row
+let recurringLines = {};              // client_id → [püsirea read] (litsentsitasud)
 let subscriptions = {};               // `${client_id}|${template_id}` → subscription row
 let docRequests = {};                 // client_id → doc request row
 let saveTimers = {};                  // debounce timers per (client, template, field)
@@ -559,7 +588,7 @@ async function init() {
     return;
   }
 
-  await Promise.all([loadClients(), loadTemplates(), loadRates(), loadSubscriptions(), loadDocRequests()]);
+  await Promise.all([loadClients(), loadTemplates(), loadRates(), loadRecurringLines(), loadSubscriptions(), loadDocRequests()]);
 
   document.getElementById('loading-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
@@ -599,6 +628,16 @@ async function loadRates() {
   if (error) { console.error('rates:', error); return; }
   rates = {};
   (data || []).forEach(r => { rates[r.client_id] = r; });
+}
+
+async function loadRecurringLines() {
+  const { data, error } = await sb.from('client_recurring_lines')
+    .select('*')
+    .order('sort', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (error) { console.error('recurring lines:', error); return; }
+  recurringLines = {};
+  (data || []).forEach(r => { (recurringLines[r.client_id] ||= []).push(r); });
 }
 
 async function loadSubscriptions() {
@@ -692,6 +731,27 @@ function render() {
   });
   grid.querySelectorAll('[data-rate-amount]').forEach(el => {
     el.addEventListener('input', () => debounceSaveRate(el.dataset.client));
+  });
+  grid.querySelectorAll('[data-rec-add]').forEach(el => {
+    el.addEventListener('change', () => {
+      const v = el.value; el.value = '';
+      if (v) addRecLine(el.dataset.client, v === '__custom__' ? '' : v);
+    });
+  });
+  grid.querySelectorAll('[data-rec-label]').forEach(el => {
+    el.addEventListener('input', () => debounceRecSave(el.dataset.recId, 'label', el.value));
+  });
+  grid.querySelectorAll('[data-rec-price]').forEach(el => {
+    el.addEventListener('input', () => debounceRecSave(el.dataset.recId, 'price_eur', el.value));
+  });
+  grid.querySelectorAll('[data-rec-vat]').forEach(el => {
+    el.addEventListener('change', () => saveRecField(el.dataset.recId, 'vat_rate', el.value));
+  });
+  grid.querySelectorAll('[data-rec-active]').forEach(el => {
+    el.addEventListener('change', () => saveRecField(el.dataset.recId, 'active', el.checked));
+  });
+  grid.querySelectorAll('[data-rec-del]').forEach(el => {
+    el.addEventListener('click', () => deleteRecLine(el.dataset.recId));
   });
 }
 
@@ -812,6 +872,100 @@ async function saveRate(clientId) {
   if (st) { st.textContent = '✓ salvestatud'; setTimeout(() => { if (st.textContent === '✓ salvestatud') st.textContent = ''; }, 1600); }
 }
 
+// ── Püsiread arvel (litsentsitasud) ──────────────────────────────
+function renderRecurringSection(client) {
+  const lines = recurringLines[client.id] || [];
+  const rowsHtml = lines.length
+    ? lines.map(renderRecLineRow).join('')
+    : '<div class="rec-empty">Püsiridu pole. Lisa allpool, kui kliendile lisandub litsentsitasu.</div>';
+  return `
+    <div class="rec-section">
+      <div class="rec-header">
+        <span>🧾</span>
+        <span class="rec-title">Püsiread arvel</span>
+        <span class="rec-hint">lisatakse igale arvele eraldi reana</span>
+      </div>
+      ${rowsHtml}
+      <div class="rec-add">
+        <select data-rec-add data-client="${client.id}" title="Lisa uus püsirida">
+          <option value="">+ Lisa püsirida…</option>
+          <option value="Merit Aktiva Premium paketi kuulitsents">Merit Aktiva Premium paketi kuulitsents</option>
+          <option value="Merit Aktiva kasutaja kuulitsents">Merit Aktiva kasutaja kuulitsents</option>
+          <option value="CostPocket kuulitsents">CostPocket kuulitsents</option>
+          <option value="__custom__">Muu (kirjuta ise)…</option>
+        </select>
+      </div>
+    </div>`;
+}
+
+function renderRecLineRow(l) {
+  const vatOpts = [24, 22, 20, 9, 0]
+    .map(v => `<option value="${v}" ${Number(l.vat_rate) === v ? 'selected' : ''}>${v}%</option>`).join('');
+  const priceVal = (l.price_eur === null || l.price_eur === undefined) ? '' : l.price_eur;
+  return `
+    <div class="rec-line ${l.active ? '' : 'inactive'}">
+      <input type="checkbox" data-rec-active data-rec-id="${l.id}" ${l.active ? 'checked' : ''} title="Aktiivne — läheb arvele">
+      <input type="text" class="rec-label-in" data-rec-label data-rec-id="${l.id}"
+             value="${escapeHtml(l.label || '')}" placeholder="Rea nimetus arvel">
+      <input type="number" class="rec-price-in" data-rec-price data-rec-id="${l.id}"
+             value="${priceVal}" step="0.01" min="0" placeholder="0.00" title="Hind €, km-ta">
+      <select class="rec-vat-in" data-rec-vat data-rec-id="${l.id}" title="Käibemaksumäär">${vatOpts}</select>
+      <button class="rec-del" data-rec-del data-rec-id="${l.id}" title="Kustuta rida">✕</button>
+    </div>`;
+}
+
+function findRecLine(id) {
+  for (const cid in recurringLines) {
+    const arr = recurringLines[cid];
+    const i = arr.findIndex(x => x.id === id);
+    if (i >= 0) return { cid, arr, i, row: arr[i] };
+  }
+  return null;
+}
+
+async function addRecLine(clientId, label) {
+  const sort = (recurringLines[clientId]?.length || 0);
+  const { data, error } = await sb.from('client_recurring_lines')
+    .insert({ client_id: clientId, label: label || '', price_eur: 0, vat_rate: 24, active: true, sort, updated_by: currentUser.id })
+    .select().single();
+  if (error) { showToast('Viga: ' + error.message, 'error'); return; }
+  (recurringLines[clientId] ||= []).push(data);
+  render();
+  showToast('Püsirida lisatud');
+}
+
+function debounceRecSave(id, field, value) {
+  const key = `rec|${id}|${field}`;
+  clearTimeout(saveTimers[key]);
+  saveTimers[key] = setTimeout(() => saveRecField(id, field, value), 600);
+}
+
+async function saveRecField(id, field, rawValue) {
+  const loc = findRecLine(id);
+  if (!loc) return;
+  let value = rawValue;
+  if (field === 'price_eur') { value = parseFloat(rawValue); if (isNaN(value) || value < 0) return; }
+  else if (field === 'vat_rate') { value = parseFloat(rawValue); if (isNaN(value)) return; }
+  else if (field === 'label') { value = (rawValue || '').trim(); }
+  const patch = { [field]: value, updated_at: new Date().toISOString(), updated_by: currentUser.id };
+  const { error } = await sb.from('client_recurring_lines').update(patch).eq('id', id);
+  if (error) { showToast('Viga: ' + error.message, 'error'); return; }
+  loc.row[field] = value;
+  if (field === 'active') render(); // peida/näita visuaalselt
+}
+
+async function deleteRecLine(id) {
+  const loc = findRecLine(id);
+  if (!loc) return;
+  const nm = loc.row.label || 'see rida';
+  if (!confirm(`Kustutan püsirea "${nm}"?`)) return;
+  const { error } = await sb.from('client_recurring_lines').delete().eq('id', id);
+  if (error) { showToast('Viga: ' + error.message, 'error'); return; }
+  loc.arr.splice(loc.i, 1);
+  render();
+  showToast('Püsirida kustutatud');
+}
+
 function renderClientCard(client) {
   // Erimallid (is_special) ei kuvata kliendikaardil — neid määratakse Mallid-lehe kliendivalijaga
   const rows = templates.filter(tpl => !tpl.is_special).map(tpl => renderTemplateRow(client.id, tpl)).join('');
@@ -826,6 +980,7 @@ function renderClientCard(client) {
         </select>
       </div>
       ${renderRateSection(client)}
+      ${renderRecurringSection(client)}
       ${renderNotesSection(client)}
       <div class="templates-list">
         ${rows || '<div class="empty-msg">Mallid puuduvad.</div>'}

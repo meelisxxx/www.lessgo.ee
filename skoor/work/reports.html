@@ -181,6 +181,11 @@
       border-radius: var(--radius);
       padding: 16px 18px;
     }
+    .rec-note {
+      margin-top: 10px; font-size: 12px; color: var(--text2);
+      background: var(--bg3); border-radius: 6px; padding: 6px 10px;
+      cursor: help;
+    }
     .invoice-card.locked    { border-color: rgba(245,158,11,0.4); }
     .invoice-card.exported  { border-color: rgba(16,185,129,0.4); }
     .invoice-card.failed    { border-color: rgba(239,68,68,0.5); }
@@ -429,6 +434,7 @@ let currentUser = null;
 let isAdmin = false;
 let clients = [];                // [{id, name, slug, merit_evemee_customer_id, merit_evemee_reg_no, merit_evemee_country_code}]
 let rates = {};                  // client_id → rate row
+let recurringByClient = {};      // client_id → [aktiivsed püsiread] (eelvaate summaks)
 let entriesByClient = {};        // client_id → { tracked_minutes, adj_minutes }
 let invoicesByClient = {};       // client_id → monthly_invoice row
 let currentPeriod = lastPeriod();
@@ -505,18 +511,23 @@ function calcOpen(clientId) {
   const r = rates[clientId];
   const total_minutes = (e.tracked_minutes || 0) + (e.adj_minutes || 0);
 
-  if (!r) return { ...e, total_minutes, total_eur: null, vat_eur: null, total_with_vat: null, missing_rate: true };
+  const rec = recurringTotals(clientId);
+  if (!r) return { ...e, total_minutes, total_eur: null, vat_eur: null, total_with_vat: null, recurring: rec, missing_rate: true };
 
-  let total_eur;
+  let service_net;
   if (r.is_fixed_price) {
-    total_eur = r.fixed_price_eur || 0;
+    service_net = r.fixed_price_eur || 0;
   } else if (total_minutes === 0) {
-    total_eur = 0;
+    service_net = 0;
   } else {
-    total_eur = Math.round((total_minutes / 60) * (r.rate_eur || 0) * 100) / 100;
+    service_net = Math.round((total_minutes / 60) * (r.rate_eur || 0) * 100) / 100;
   }
-  const vat_eur = Math.round(total_eur * 0.24 * 100) / 100;
-  return { ...e, total_minutes, rate: r, total_eur, vat_eur, total_with_vat: total_eur + vat_eur, missing_rate: false };
+  const service_vat = Math.round(service_net * 0.24 * 100) / 100;
+  const total_eur = Math.round((service_net + rec.net) * 100) / 100;
+  const vat_eur   = Math.round((service_vat + rec.vat) * 100) / 100;
+  return { ...e, total_minutes, rate: r, service_net, service_vat,
+           recurring: rec, total_eur, vat_eur, total_with_vat: Math.round((total_eur + vat_eur) * 100) / 100,
+           missing_rate: false };
 }
 
 // ── Init ────────────────────────────────────────────────────────
@@ -538,6 +549,7 @@ async function init() {
 
   await loadClients();
   await loadRates();
+  await loadRecurringLines();
 
   document.getElementById('loading-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
@@ -570,6 +582,29 @@ async function loadRates() {
   if (error) { showToast('Hindu ei saanud laadida: ' + error.message, 'error'); return; }
   rates = {};
   (data || []).forEach(r => { rates[r.client_id] = r; });
+}
+
+async function loadRecurringLines() {
+  // Ainult aktiivsed read — eelvaate summa (lukustamisel snapshot'itakse serveris)
+  const { data, error } = await sb.from('client_recurring_lines')
+    .select('client_id, label, price_eur, vat_rate, active')
+    .eq('active', true);
+  if (error) { console.error('recurring lines:', error); return; }
+  recurringByClient = {};
+  (data || []).forEach(r => { (recurringByClient[r.client_id] ||= []).push(r); });
+}
+
+// Aktiivsete püsiridade netosumma + km (eelvaate jaoks)
+function recurringTotals(clientId) {
+  const lines = recurringByClient[clientId] || [];
+  let net = 0, vat = 0;
+  for (const l of lines) {
+    const p = Number(l.price_eur) || 0;
+    net += p;
+    vat += Math.round(p * (Number(l.vat_rate) || 0) / 100 * 100) / 100;
+  }
+  return { net: Math.round(net * 100) / 100, vat: Math.round(vat * 100) / 100, count: lines.length,
+           labels: lines.map(l => l.label) };
 }
 
 async function loadInvoicesAndEntries() {
@@ -798,6 +833,8 @@ function renderInvoiceCard(client) {
         </div>
       </div>
 
+      ${renderRecurringNote(calc)}
+
       ${renderMeritInfo(inv)}
 
       <div class="invoice-foot">
@@ -809,6 +846,7 @@ function renderInvoiceCard(client) {
 
 function snapshotToCalc(inv) {
   const s = inv.snapshot || {};
+  const recLines = s.recurring_lines || [];
   return {
     tracked_minutes: s.tracked_minutes || 0,
     adj_minutes:     s.adj_minutes || 0,
@@ -816,11 +854,24 @@ function snapshotToCalc(inv) {
     rate_eur:        s.rate_eur,
     is_fixed_price:  s.is_fixed_price,
     fixed_price_eur: s.fixed_price_eur,
+    recurring: {
+      net:    Number(s.recurring_net || 0),
+      vat:    Number(s.recurring_vat || 0),
+      count:  recLines.length,
+      labels: recLines.map(l => l.label)
+    },
     total_eur:       Number(inv.total_eur),
     vat_eur:         Number(inv.vat_eur),
     total_with_vat:  Number(inv.total_with_vat),
     missing_rate:    false
   };
+}
+
+function renderRecurringNote(calc) {
+  const rec = calc.recurring;
+  if (!rec || !rec.count) return '';
+  const tip = (rec.labels || []).filter(Boolean).join(' · ');
+  return `<div class="rec-note" title="${escapeHtml(tip)}">＋ ${rec.count} püsirida (litsentsid) · ${fmtEur(rec.net)} km-ta</div>`;
 }
 
 function renderMeritInfo(inv) {
